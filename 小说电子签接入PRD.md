@@ -1,4 +1,21 @@
-# 小说业务接入腾讯电子签 PRD（V1.1 决策回填稿）
+# 小说业务接入腾讯电子签 PRD（V1.2 原型对齐稿）
+
+| 文档信息 | 内容 |
+|---|---|
+| 文档版本 | V1.2 |
+| 文档状态 | 评审稿；企业签署配置、法务结论及技术接入资料待补充 |
+| 产品负责人 | 洪娟 |
+| 更新时间 | 2026-07-23 |
+| 在线原型 | https://hongjuan303.github.io/html-prototypes/novel-esign-demos/ |
+| 源码仓库 | https://github.com/hongjuan303/novel-esign-demos |
+
+### 版本记录
+
+| 版本 | 日期 | 主要变更 |
+|---|---|---|
+| V1.0 | 2026-07 | 完成腾讯电子签接入初版范围、流程及异常设计 |
+| V1.1 | 2026-07-23 | 回填作者先签、买断/保底模板、资料前置、文件名额及历史 E签宝策略 |
+| V1.2 | 2026-07-23 | 对齐作者投稿后台与内部绿台高保真原型，补充公开原型、接口依据和最终验收口径 |
 
 ## 1. 文档结论
 
@@ -287,3 +304,22 @@
 - V1.0：仅覆盖切换日后新合同；买断/保底模板发起、作者先签、平台后签、回调同步、双文件回写、查看进度、催签/撤销、稿费审核数据自动衔接。
 - V1.1：按法务结论上线合同参数审批、批量发起/催签、异常工作台、对账报表。
 - V1.2：解约/补充协议、模板在线版本治理、自动付款/税务协同。
+
+## 14. 参考资料与交付物
+
+- 作者投稿后台：https://duanpian.weiduanju.com/
+- 内部绿台小说管理：https://manage.qiguoread.com/dist/#/novelManage/novelManagement
+- 高保真交互原型：https://hongjuan303.github.io/html-prototypes/novel-esign-demos/
+- 原型源码：https://github.com/hongjuan303/novel-esign-demos
+- 腾讯电子签企业版开发者中心：https://qian.tencent.com/developers/company/overview
+- 创建签署流程 `CreateFlow`：https://qian.tencent.com/developers/companyApis/startFlows/CreateFlow/
+- 创建电子文档 `CreateDocument`：https://qian.tencent.com/developers/companyApis/startFlows/CreateDocument/
+- 获取 H5 签署链接 `CreateFlowSignUrl`：https://qian.tencent.com/developers/companyApis/startFlows/CreateFlowSignUrl/
+- 回调通知说明：https://qian.tencent.com/developers/company/callbacks/
+
+### 官方接口复核结论
+
+- 模板发起需要先创建签署流程，再创建并填充电子文档；文档合成为异步过程，应在合成完成后启动签署流程。
+- H5 签署链接按需实时生成，默认有效期较短；过期后重新生成链接，不应新建合同流程。
+- 合同结果以服务端回调与主动查询为准，返回投稿后台不等同于签署完成。
+- 当前 Demo 中的腾讯发起、作者签署及企业签署均为交互模拟，不代表生产环境已配置完成。
