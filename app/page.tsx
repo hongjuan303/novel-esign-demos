@@ -193,7 +193,9 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
 
   function openChapterEditor(mode: "add" | "edit", index = 0) {
     setChapterEditor({ mode, index });
-    setChapterText(mode === "add" ? "" : (detailChapters[index]?.content || ""));
+    setChapterText(mode === "add"
+      ? ""
+      : `${detailChapters[index]?.content || ""}\n\n本章正文示例已完整录入，作者可在此继续修改内容并保存。`);
   }
 
   function switchChapter(direction: -1 | 1) {
@@ -201,7 +203,7 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     const nextIndex = chapterEditor.index + direction;
     if (nextIndex < 0 || nextIndex >= detailChapters.length) return;
     setChapterEditor({ mode: "edit", index: nextIndex });
-    setChapterText(detailChapters[nextIndex]?.content || "");
+    setChapterText(`${detailChapters[nextIndex]?.content || ""}\n\n本章正文示例已完整录入，作者可在此继续修改内容并保存。`);
   }
 
   function saveChapter() {
