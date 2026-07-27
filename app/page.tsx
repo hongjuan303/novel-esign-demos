@@ -3,6 +3,20 @@
 import { useState } from "react";
 
 type EsignState = "待发起" | "待作者签署" | "待平台签署" | "签署完成";
+type ImportStage = "upload" | "preview";
+
+const importedChapters = [
+  { title: "第1章　雨夜来信", words: "1,426" },
+  { title: "第2章　旧城重逢", words: "1,138" },
+  { title: "第3章　被藏起来的真相", words: "1,287" },
+  { title: "第4章　第七封信", words: "1,054" },
+  { title: "第5章　潮水退去以后", words: "1,216" },
+  { title: "第6章　没有寄出的答案", words: "1,108" },
+  { title: "第7章　重回旧站台", words: "1,192" },
+  { title: "第8章　雨停之后", words: "1,065" },
+];
+
+const importedGuide = "一封迟到七年的信，让她重新回到那座被雨困住的海港小城。";
 
 const novels = [
   {
@@ -48,14 +62,26 @@ function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: 
 }
 
 function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: EsignState) => void }) {
-  const [view, setView] = useState<"works" | "income" | "profile" | "editors" | "create" | "content">("works");
+  const [view, setView] = useState<"works" | "income" | "profile" | "editors" | "content" | "draftContent">("works");
   const [signModal, setSignModal] = useState(false);
   const [applyModal, setApplyModal] = useState(false);
   const [signing, setSigning] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
-  const [createStep, setCreateStep] = useState<1 | 2>(1);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [toast, setToast] = useState("");
+  const [createNovelModal, setCreateNovelModal] = useState(false);
+  const [importNovelModal, setImportNovelModal] = useState(false);
+  const [importStage, setImportStage] = useState<ImportStage>("upload");
+  const [importFileName, setImportFileName] = useState("");
+  const [draftCreated, setDraftCreated] = useState(false);
+  const [draftImported, setDraftImported] = useState(false);
+  const [novelName, setNovelName] = useState("");
+  const [novelIntro, setNovelIntro] = useState("");
+  const [finishDate, setFinishDate] = useState("");
+  const [novelTags, setNovelTags] = useState<string[]>([]);
+  const [category, setCategory] = useState<"男频" | "女频">("男频");
+  const [novelType, setNovelType] = useState<"长篇" | "短篇">("短篇");
+  const [customCover, setCustomCover] = useState(false);
 
   const stateCopy = {
     待发起: { label: "待签约", detail: "审核已通过，编辑正在准备电子合同", action: "查看进度" },
@@ -79,6 +105,53 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     }, 900);
   }
 
+  const createNovelValid =
+    novelName.trim().length > 0 &&
+    finishDate.length > 0 &&
+    novelTags.length > 0;
+
+  function openCreateNovel() {
+    setNovelName("");
+    setNovelIntro("");
+    setFinishDate("");
+    setNovelTags([]);
+    setCategory("男频");
+    setNovelType("短篇");
+    setCustomCover(false);
+    setCreateNovelModal(true);
+  }
+
+  function toggleTag(tag: string) {
+    setNovelTags(current =>
+      current.includes(tag)
+        ? current.filter(item => item !== tag)
+        : [...current, tag],
+    );
+  }
+
+  function createNovel() {
+    if (!createNovelValid) return;
+    setDraftCreated(true);
+    setDraftImported(false);
+    setCreateNovelModal(false);
+    setView("draftContent");
+    notify("小说已创建，请继续导入正文");
+  }
+
+  function openImportNovel() {
+    setImportStage("upload");
+    setImportFileName("");
+    setImportNovelModal(true);
+  }
+
+  function finishImport() {
+    const introWasEmpty = novelIntro.trim().length === 0;
+    if (introWasEmpty) setNovelIntro(importedGuide);
+    setDraftImported(true);
+    setImportNovelModal(false);
+    notify(introWasEmpty ? "导入成功，已自动使用文档导语补充简介" : "小说正文导入成功");
+  }
+
   const menuItems = [
     { id: "works", label: "作品管理", icon: "▣" },
     { id: "income", label: "收益管理", icon: "¥" },
@@ -94,7 +167,7 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
       </header>
       <div className="author-live-layout">
         <aside className="author-live-sidebar">
-          {menuItems.map(item => <button key={item.id} className={view === item.id || (item.id === "works" && (view === "create" || view === "content")) ? "active" : ""} onClick={() => setView(item.id)}>
+          {menuItems.map(item => <button key={item.id} className={view === item.id || (item.id === "works" && (view === "content" || view === "draftContent")) ? "active" : ""} onClick={() => setView(item.id)}>
             <i>{item.icon}</i><span>{item.label}</span>
           </button>)}
         </aside>
@@ -105,9 +178,22 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
               <select defaultValue="all"><option value="all">全部状态</option><option>草稿</option><option>审核中</option><option>待签约</option><option>签约完成</option><option>终止签约</option></select>
               <input placeholder="⌕ 查询小说名称" />
               <button className="mint-button">查 询</button>
-              <button className="mint-button create" onClick={() => {setCreateStep(1);setView("create");}}>⊕ 创建小说</button>
+              <button className="mint-button create" onClick={openCreateNovel}>⊕ 新建小说</button>
             </section>
             <section className="author-work-list">
+              {draftCreated && <article className="author-work-row new-draft-row">
+                <div className={`live-cover generated ${customCover ? "custom" : ""}`}><span>{novelName}</span></div>
+                <div className="live-work-main">
+                  <div className="live-work-title"><h2>{novelName}</h2><span className="live-status draft">草稿</span></div>
+                  <p>溪源 著</p>
+                  <small>{draftImported ? "9,486字" : "0字"}　｜　{category} · {novelType} · {novelTags.join("、")}</small>
+                  <div className={`live-contract-line ${draftImported ? "plain" : ""}`}>{draftImported ? "正文已导入，可继续校对章节和申请签约" : "基础信息已保存，请导入 .doc / .docx 小说正文"}</div>
+                </div>
+                <div className="live-work-actions">
+                  <button className="inline-mint" onClick={() => setView("draftContent")}>▱ 小说详情</button>
+                  <button className="pill-action" onClick={() => {setView("draftContent"); if (!draftImported) openImportNovel();}}>{draftImported ? "查看作品" : "导入小说"}</button>
+                </div>
+              </article>}
               <article className="author-work-row contract-row">
                 <div className="live-cover purple">声声已离<br/>商音近</div>
                 <div className="live-work-main">
@@ -177,17 +263,38 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
             {[["长青","930866698","青"],["泡芙","1007540407","芙"],["元元","3259515689","元"]].map(editor => <article key={editor[0]}><i>{editor[2]}</i><div><h3>{editor[0]}</h3><p>QQ：{editor[1]}</p></div><button onClick={() => notify(`已复制 ${editor[0]} 的 QQ`)}>复制</button></article>)}
           </div></section>}
 
-          {view === "create" && <section className="author-page-card create-work-page">
+          {view === "draftContent" && <section className="author-page-card draft-detail-page">
             <button className="back-link" onClick={() => setView("works")}>‹　返回作品管理</button>
-            <div className="create-heading"><div className="create-cover">书名<br/>示例</div><div><h1>创建小说</h1><p>溪源 著</p></div><span>步骤 {createStep} / 2</span></div>
-            {createStep === 1 ? <div className="create-form">
-              <label><span><b>*</b> 名称</span><input defaultValue="雨停之后的第七封信" maxLength={50}/><small>12 / 50</small></label>
-              <label><span><b>*</b> 导语</span><textarea defaultValue="一封迟到七年的信，让她重新回到那座被雨困住的海港小城。"/><small>30 / 5000</small></label>
-              <label><span>频道</span><div className="radio-line"><label><input type="radio" defaultChecked name="channel"/> 男频</label><label><input type="radio" name="channel"/> 女频</label></div></label>
-              <label><span>标签</span><select defaultValue="city"><option value="city">都市情感</option><option>悬疑推理</option><option>现实生活</option></select></label>
-              <label><span>完结日期</span><input defaultValue="2026-08-15"/></label>
-            </div> : <div className="content-editor-mock"><div className="editor-toolbar"><button>B</button><button>I</button><button>段落</button><button>撤销</button><span>8,846字</span></div><textarea defaultValue={"第一章　雨夜来信\n\n海港的雨下了整整三天。林知夏在关店前，从门缝里捡到一封没有寄件地址的信。\n\n信封已经被雨水洇湿，右下角却清晰地写着她七年前用过的名字……"}/><p>小说内容需控制在 8,000～20,000 字内</p></div>}
-            <div className="create-actions"><button className="soft-button" onClick={() => createStep === 1 ? setView("works") : setCreateStep(1)}>取消</button><button className="mint-button" onClick={() => createStep === 1 ? setCreateStep(2) : (notify("小说草稿已保存"),setView("works"))}>{createStep === 1 ? "下一步" : "保存草稿"}</button></div>
+            <div className="draft-detail-heading">
+              <div className={`detail-cover generated ${customCover ? "custom" : ""}`}><span>{novelName || "小说名称"}</span></div>
+              <div className="draft-detail-title">
+                <div><h1>{novelName || "未命名小说"}</h1><span className="live-status draft">草稿</span></div>
+                <p>溪源 著　·　{category}　·　{novelType}　·　完结日期 {finishDate || "待填写"}</p>
+                <div className="detail-tags">{novelTags.map(tag => <span key={tag}>{tag}</span>)}</div>
+              </div>
+              <div className="draft-detail-actions">
+                <button className="mint-button" onClick={openImportNovel}>⇧ 导入小说</button>
+                <button className="soft-button" onClick={() => notify("已进入新增章节编辑器")}>＋ 新增章节</button>
+              </div>
+            </div>
+            <div className="draft-intro-card">
+              <div><b>简介</b><button onClick={() => notify("已进入简介编辑模式")}>编辑</button></div>
+              <p>{novelIntro || "暂未填写。导入小说后，系统将自动使用文档中的导语补充简介。"}</p>
+              {!novelIntro && <small>自动回填不会覆盖作者已填写的简介</small>}
+            </div>
+            {draftImported ? <div className="chapter-list-card">
+              <div className="chapter-list-heading"><div><h2>章节列表</h2><p>共 8 章 · 9,486 字 · 导入于刚刚</p></div><span className="import-success">✓ 导入完成</span></div>
+              <table>
+                <thead><tr><th>章节</th><th>字数</th><th>更新时间</th><th>操作</th></tr></thead>
+                <tbody>{importedChapters.map((chapter, index) => <tr key={chapter.title}><td><b>{chapter.title}</b>{index === 0 && <span>导语已提取</span>}</td><td>{chapter.words}</td><td>2026-07-27 14:{18 + index}</td><td><button onClick={() => notify(`已打开${chapter.title}`)}>编辑</button><button className="muted" onClick={() => notify("Demo 中未执行删除")}>删除</button></td></tr>)}</tbody>
+              </table>
+            </div> : <div className="empty-chapters">
+              <div className="document-icon">DOCX</div>
+              <h2>还没有小说正文</h2>
+              <p>沿用绿台导入方式，支持上传 .doc、.docx 文件；导入前可预览章节识别结果。</p>
+              <button className="mint-button" onClick={openImportNovel}>导入小说</button>
+              <small>也可以使用“新增章节”逐章录入</small>
+            </div>}
           </section>}
 
           {view === "content" && <section className="author-page-card content-page">
@@ -199,7 +306,51 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
         </main>
       </div>
 
-      {applyModal && <div className="overlay" onClick={() => setApplyModal(false)}><div className="author-confirm-modal" onClick={event => event.stopPropagation()}><button className="close" onClick={() => setApplyModal(false)}>×</button><i>♢</i><h2>确认申请签约</h2><p>提交后作品将进入编辑审核，审核期间不可修改正文。</p><ul><li>✓ 正文字数 8,832，符合 8,000～20,000 字要求</li><li>✓ 账号与签约资料已完整</li><li>✓ 作品名称、导语、频道、标签和完结日期已填写</li></ul><div className="modal-actions"><button className="soft-button" onClick={() => setApplyModal(false)}>取消</button><button className="mint-button" onClick={() => {setApplyModal(false);notify("申请签约已提交，作品进入审核中");}}>确认申请</button></div></div></div>}
+      {createNovelModal && <div className="overlay" onClick={() => setCreateNovelModal(false)}>
+        <div className="author-novel-modal" onClick={event => event.stopPropagation()}>
+          <div className="novel-modal-header"><div><h2>新建小说</h2><p>先创建作品信息，再进入详情导入小说正文</p></div><button className="close" onClick={() => setCreateNovelModal(false)}>×</button></div>
+          <div className="novel-modal-body">
+            <aside className="cover-builder">
+              <div className={`generated-cover-preview ${customCover ? "custom" : ""}`}><span>{novelName || "小说名称"}</span><small>{customCover ? "自定义封面预览" : "默认封面预览"}</small></div>
+              <button className="cover-upload-button" onClick={() => setCustomCover(!customCover)}>{customCover ? "恢复默认封面" : "上传封面"}</button>
+              <p>非必填。不上传时使用默认底图，并自动叠加小说名称。</p>
+            </aside>
+            <div className="author-create-form">
+              <section><h3>小说信息</h3>
+                <label className="form-field"><span><b>*</b> 小说名称</span><div><input value={novelName} onChange={event => setNovelName(event.target.value)} placeholder="请输入小说名称" maxLength={50}/><small>{novelName.length}/50</small></div></label>
+                <label className="form-field"><span>简介</span><div><textarea value={novelIntro} onChange={event => setNovelIntro(event.target.value)} placeholder="请输入简介（选填）" maxLength={500}/><small>{novelIntro.length}/500</small><em>若未填写，导入小说后自动使用文档导语补充</em></div></label>
+                <label className="form-field"><span><b>*</b> 完结日期</span><div><input type="date" value={finishDate} onChange={event => setFinishDate(event.target.value)}/><em>精确到天</em></div></label>
+              </section>
+              <section><h3>内容信息</h3>
+                <div className="form-field"><span><b>*</b> 标签</span><div className="tag-picker">{["都市情感","悬疑推理","现实生活","追妻火葬场","女性成长","爽文"].map(tag => <button type="button" key={tag} className={novelTags.includes(tag) ? "selected" : ""} onClick={() => toggleTag(tag)}>{novelTags.includes(tag) ? "✓ " : ""}{tag}</button>)}<em>至少选择 1 个标签</em></div></div>
+                <div className="form-field"><span><b>*</b> 分类</span><div className="choice-cards"><button type="button" className={category === "男频" ? "selected" : ""} onClick={() => setCategory("男频")}>男频</button><button type="button" className={category === "女频" ? "selected" : ""} onClick={() => setCategory("女频")}>女频</button></div></div>
+                <div className="form-field"><span><b>*</b> 小说类型</span><div className="choice-cards"><button type="button" className={novelType === "长篇" ? "selected" : ""} onClick={() => setNovelType("长篇")}>长篇</button><button type="button" className={novelType === "短篇" ? "selected" : ""} onClick={() => setNovelType("短篇")}>短篇</button></div></div>
+              </section>
+            </div>
+          </div>
+          <div className="novel-modal-footer"><span>{createNovelValid ? "信息已完整，可以创建" : "请填写小说名称、完结日期并至少选择 1 个标签"}</span><button className="soft-button" onClick={() => setCreateNovelModal(false)}>取消</button><button className="mint-button" disabled={!createNovelValid} onClick={createNovel}>确定创建</button></div>
+        </div>
+      </div>}
+
+      {importNovelModal && <div className="overlay" onClick={() => setImportNovelModal(false)}>
+        <div className="author-import-modal" onClick={event => event.stopPropagation()}>
+          <div className="novel-modal-header"><div><h2>导入小说</h2><p>{novelName || "当前小说"} · 支持 .doc、.docx</p></div><button className="close" onClick={() => setImportNovelModal(false)}>×</button></div>
+          {importStage === "upload" ? <div className="import-modal-content">
+            <button className={`import-dropzone ${importFileName ? "has-file" : ""}`} onClick={() => setImportFileName("雨停之后的第七封信.docx")}>
+              <i>{importFileName ? "DOCX" : "⇧"}</i>
+              {importFileName ? <><b>{importFileName}</b><span>186 KB · 已选择</span><em>点击重新选择</em></> : <><b>将文件拖到此处，或点击上传</b><span>支持扩展名：.doc、.docx，单个文件不超过 20MB</span></>}
+            </button>
+            <div className="import-rules"><b>导入说明</b><ul><li>系统按“第1章 / 第一章”等标题自动拆分章节</li><li>导入前可预览章节名称、数量和字数</li><li>新建时未填写简介，将自动使用文档导语补充</li><li>已有简介不会被覆盖</li></ul></div>
+          </div> : <div className="import-preview-content">
+            <div className="preview-summary"><i>✓</i><div><b>文件解析完成</b><span>{importFileName} · 识别到 8 章，共 9,486 字</span></div></div>
+            <div className="extracted-guide"><b>识别到文档导语</b><p>{importedGuide}</p><span>{novelIntro ? "当前小说已有简介，本次导入不会覆盖。" : "当前小说未填写简介，确认导入后将自动回填。"}</span></div>
+            <div className="preview-chapters"><div><b>章节预览</b><span>共 8 章</span></div><table><thead><tr><th>序号</th><th>章节名称</th><th>字数</th><th>识别结果</th></tr></thead><tbody>{importedChapters.slice(0,4).map((chapter,index) => <tr key={chapter.title}><td>{index + 1}</td><td>{chapter.title}</td><td>{chapter.words}</td><td><span>正常</span></td></tr>)}</tbody></table><p>另有 4 章已识别，确认导入后将全部写入。</p></div>
+          </div>}
+          <div className="novel-modal-footer"><span>{importStage === "upload" ? "选择文件后可预览识别结果" : "请确认章节拆分和导语内容"}</span><button className="soft-button" onClick={() => importStage === "preview" ? setImportStage("upload") : setImportNovelModal(false)}>{importStage === "preview" ? "上一步" : "取消"}</button><button className="mint-button" disabled={importStage === "upload" && !importFileName} onClick={() => importStage === "upload" ? setImportStage("preview") : finishImport()}>{importStage === "upload" ? "预览" : "确认导入"}</button></div>
+        </div>
+      </div>}
+
+      {applyModal && <div className="overlay" onClick={() => setApplyModal(false)}><div className="author-confirm-modal" onClick={event => event.stopPropagation()}><button className="close" onClick={() => setApplyModal(false)}>×</button><i>♢</i><h2>确认申请签约</h2><p>提交后作品将进入编辑审核，审核期间不可修改正文。</p><ul><li>✓ 正文字数 8,832，符合 8,000～20,000 字要求</li><li>✓ 账号与签约资料已完整</li><li>✓ 小说名称、分类、标签、小说类型和完结日期已填写</li></ul><div className="modal-actions"><button className="soft-button" onClick={() => setApplyModal(false)}>取消</button><button className="mint-button" onClick={() => {setApplyModal(false);notify("申请签约已提交，作品进入审核中");}}>确认申请</button></div></div></div>}
 
       {signModal && <div className="overlay" onClick={() => setSignModal(false)}><div className="author-contract-modal live-style" onClick={event => event.stopPropagation()}>
         <button className="close" onClick={() => setSignModal(false)}>×</button><div className="tencent-mark">✓ 腾讯电子签</div><h2>{state === "待作者签署" ? "签署前确认" : "电子合同详情"}</h2><p>《声声已离商音近》短篇小说版权合同（保底）</p>

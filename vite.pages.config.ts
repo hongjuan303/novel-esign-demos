@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
 const projectRoot = fileURLToPath(new URL(".", import.meta.url));
-const pagesBase = process.env.PAGES_BASE ?? "/novel-esign-demos/";
+const pagesBase =
+  process.env.PAGES_BASE ?? "/html-prototypes/novel-esign-demos/";
 
 export default defineConfig({
   root: fileURLToPath(new URL("./pages", import.meta.url)),
