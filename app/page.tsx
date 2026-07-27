@@ -17,6 +17,17 @@ const importedChapters = [
 ];
 
 const importedGuide = "一封迟到七年的信，让她重新回到那座被雨困住的海港小城。";
+const existingNovelGuide = "七年前离开的人在雨夜归来，一通没有归属地的电话，让被掩埋的旧事重新浮出水面。";
+const chapterContentSamples = [
+  "海港的雨下了整整三天。林知夏在关店前，从门缝里捡到一封没有寄件地址的信。信封已经被雨水洇湿，右下角却清晰地写着她七年前用过的名字。她站在昏黄的灯下拆开信封，看见第一行字时，窗外恰好响起一声闷雷。",
+  "旧城的石板路被雨水洗得发亮。林知夏循着信里的地址，来到已经停运多年的车站。候车室门口站着一个熟悉的身影，他比记忆里更瘦，也更沉默。两个人隔着七年的光阴对望，谁都没有先说那句好久不见。",
+  "第二封信藏在旧站台的时刻表后面。纸页上只有一串日期，恰好对应当年事故发生前的七天。林知夏终于意识到，那场被所有人认定为意外的离别，也许从一开始就是有人精心安排的结果。",
+  "第七封信没有署名，却写着只有他们两个人知道的约定。她沿着字迹寻找线索，在海堤尽头发现一只生锈的铁盒。盒子里装着旧照片、作废的车票，以及一份迟到了七年的道歉。",
+  "潮水退去后，礁石间露出一条隐蔽的小路。林知夏顺着路走到废弃灯塔，墙上仍留着少年时画下的刻度。那些被误解的沉默、没有送达的解释，也终于在这里拼成完整的答案。",
+  "他把没有寄出的信一封封摊开，承认自己当年选择离开并不是因为背叛，而是为了替她挡下更危险的真相。林知夏听完没有立刻原谅，只是把最后一个问题重新交还给他。",
+  "清晨第一班列车重新停靠旧站台。广播声穿过薄雾，两个人站在相反的方向。林知夏握着那张旧车票，终于决定不再替过去做选择，而是为今天的自己留下答案。",
+  "雨在列车进站前停了。阳光落在积水里，也落在第七封信最后一句被反复涂改的话上。她合上信纸，穿过人群走向站台另一端，结束不是遗忘，而是终于能够重新开始。",
+];
 
 const novels = [
   {
@@ -67,7 +78,6 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
   const [applyModal, setApplyModal] = useState(false);
   const [signing, setSigning] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [createNovelModal, setCreateNovelModal] = useState(false);
   const [importNovelModal, setImportNovelModal] = useState(false);
@@ -82,6 +92,11 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
   const [category, setCategory] = useState<"男频" | "女频">("男频");
   const [novelType, setNovelType] = useState<"长篇" | "短篇">("短篇");
   const [customCover, setCustomCover] = useState(false);
+  const [chapterEditor, setChapterEditor] = useState<{ mode: "add" | "edit"; index: number } | null>(null);
+  const [chapterText, setChapterText] = useState("");
+  const [addedChapter, setAddedChapter] = useState(false);
+  const [deletedChapterIds, setDeletedChapterIds] = useState<number[]>([]);
+  const [deleteChapterId, setDeleteChapterId] = useState<number | null>(null);
 
   const stateCopy = {
     待发起: { label: "待签约", detail: "审核已通过，编辑正在准备电子合同", action: "查看进度" },
@@ -133,6 +148,8 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     if (!createNovelValid) return;
     setDraftCreated(true);
     setDraftImported(false);
+    setAddedChapter(false);
+    setDeletedChapterIds([]);
     setCreateNovelModal(false);
     setView("draftContent");
     notify("小说已创建，请继续导入正文");
@@ -150,6 +167,60 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     setDraftImported(true);
     setImportNovelModal(false);
     notify(introWasEmpty ? "导入成功，已自动使用文档导语补充简介" : "小说正文导入成功");
+  }
+
+  const isNewDraftDetail = view === "draftContent";
+  const detailNovelName = isNewDraftDetail ? (novelName || "未命名小说") : "声声已离商音近";
+  const detailNovelIntro = isNewDraftDetail
+    ? (novelIntro || "暂未填写。导入小说后，系统将自动使用文档导语补充简介。")
+    : existingNovelGuide;
+  const detailBaseChapters = isNewDraftDetail && !draftImported ? [] : importedChapters;
+  const detailChapters = [
+    ...detailBaseChapters.map((chapter, index) => ({
+      ...chapter,
+      id: 21001 + index,
+      content: chapterContentSamples[index],
+    })),
+    ...(addedChapter
+      ? [{
+          id: 21009,
+          title: `第${detailBaseChapters.length + 1}章　手动新增章节`,
+          words: "328",
+          content: chapterContentSamples[0],
+        }]
+      : []),
+  ].filter(chapter => !deletedChapterIds.includes(chapter.id));
+
+  function openChapterEditor(mode: "add" | "edit", index = 0) {
+    setChapterEditor({ mode, index });
+    setChapterText(mode === "add" ? "" : (detailChapters[index]?.content || ""));
+  }
+
+  function switchChapter(direction: -1 | 1) {
+    if (!chapterEditor || chapterEditor.mode !== "edit") return;
+    const nextIndex = chapterEditor.index + direction;
+    if (nextIndex < 0 || nextIndex >= detailChapters.length) return;
+    setChapterEditor({ mode: "edit", index: nextIndex });
+    setChapterText(detailChapters[nextIndex]?.content || "");
+  }
+
+  function saveChapter() {
+    if (!chapterEditor || chapterText.trim().length === 0) return;
+    if (chapterEditor.mode === "add") {
+      setAddedChapter(true);
+      notify(`第${detailChapters.length + 1}章已保存`);
+    } else {
+      notify(`${detailChapters[chapterEditor.index]?.title || "章节"}已保存`);
+    }
+    setChapterEditor(null);
+  }
+
+  function confirmDeleteChapter() {
+    if (deleteChapterId === null) return;
+    const chapter = detailChapters.find(item => item.id === deleteChapterId);
+    setDeletedChapterIds(current => [...current, deleteChapterId]);
+    setDeleteChapterId(null);
+    notify(`${chapter?.title || "章节"}已删除`);
   }
 
   const menuItems = [
@@ -263,45 +334,52 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
             {[["长青","930866698","青"],["泡芙","1007540407","芙"],["元元","3259515689","元"]].map(editor => <article key={editor[0]}><i>{editor[2]}</i><div><h3>{editor[0]}</h3><p>QQ：{editor[1]}</p></div><button onClick={() => notify(`已复制 ${editor[0]} 的 QQ`)}>复制</button></article>)}
           </div></section>}
 
-          {view === "draftContent" && <section className="author-page-card draft-detail-page">
-            <button className="back-link" onClick={() => setView("works")}>‹　返回作品管理</button>
-            <div className="draft-detail-heading">
-              <div className={`detail-cover generated ${customCover ? "custom" : ""}`}><span>{novelName || "小说名称"}</span></div>
-              <div className="draft-detail-title">
-                <div><h1>{novelName || "未命名小说"}</h1><span className="live-status draft">草稿</span></div>
-                <p>溪源 著　·　{category}　·　{novelType}　·　完结日期 {finishDate || "待填写"}</p>
-                <div className="detail-tags">{novelTags.map(tag => <span key={tag}>{tag}</span>)}</div>
-              </div>
-              <div className="draft-detail-actions">
-                <button className="mint-button" onClick={openImportNovel}>⇧ 导入小说</button>
-                <button className="soft-button" onClick={() => notify("已进入新增章节编辑器")}>＋ 新增章节</button>
-              </div>
+          {(view === "draftContent" || view === "content") && <section className="author-page-card greenlike-detail-page">
+            <div className="greenlike-breadcrumb">
+              <button onClick={() => setView("works")}>作品管理</button><span>/</span><b>小说详情</b>
             </div>
-            <div className="draft-intro-card">
-              <div><b>简介</b><button onClick={() => notify("已进入简介编辑模式")}>编辑</button></div>
-              <p>{novelIntro || "暂未填写。导入小说后，系统将自动使用文档中的导语补充简介。"}</p>
-              {!novelIntro && <small>自动回填不会覆盖作者已填写的简介</small>}
-            </div>
-            {draftImported ? <div className="chapter-list-card">
-              <div className="chapter-list-heading"><div><h2>章节列表</h2><p>共 8 章 · 9,486 字 · 导入于刚刚</p></div><span className="import-success">✓ 导入完成</span></div>
-              <table>
-                <thead><tr><th>章节</th><th>字数</th><th>更新时间</th><th>操作</th></tr></thead>
-                <tbody>{importedChapters.map((chapter, index) => <tr key={chapter.title}><td><b>{chapter.title}</b>{index === 0 && <span>导语已提取</span>}</td><td>{chapter.words}</td><td>2026-07-27 14:{18 + index}</td><td><button onClick={() => notify(`已打开${chapter.title}`)}>编辑</button><button className="muted" onClick={() => notify("Demo 中未执行删除")}>删除</button></td></tr>)}</tbody>
-              </table>
-            </div> : <div className="empty-chapters">
-              <div className="document-icon">DOCX</div>
-              <h2>还没有小说正文</h2>
-              <p>沿用绿台导入方式，支持上传 .doc、.docx 文件；导入前可预览章节识别结果。</p>
+            <div className="greenlike-detail-toolbar">
               <button className="mint-button" onClick={openImportNovel}>导入小说</button>
-              <small>也可以使用“新增章节”逐章录入</small>
-            </div>}
-          </section>}
-
-          {view === "content" && <section className="author-page-card content-page">
-            <div className="content-heading"><button onClick={() => setView("works")}>‹</button><div><h1>声声已离商音近</h1><span>9,427字</span></div><button className="mint-button small" onClick={() => notify("已进入正文编辑模式")}>编辑</button><button className="soft-button small" onClick={() => setHistoryOpen(true)}>历史</button></div>
-            <article className="novel-content"><h2>第一章　故人来电</h2><p>凌晨两点，商音近接到了一个没有号码归属地的电话。</p><p>听筒另一端只有雨声。她握紧手机，在那段漫长的沉默里，认出了七年前离开的人。</p><p>“声声。”那个人终于开口，“我回来了。”</p></article>
-            <div className="content-footer"><span>正文符合 8,000～20,000 字申请要求</span><button className="mint-button" onClick={() => setApplyModal(true)}>申请签约</button></div>
-            {historyOpen && <aside className="history-panel"><button onClick={() => setHistoryOpen(false)}>×</button><h3>历史记录</h3><p>保留最近 3 个版本</p><ol><li><b>版本 3</b><span>2026-07-23 10:42 · 9,427字</span></li><li><b>版本 2</b><span>2026-07-22 19:18 · 9,206字</span></li><li><b>版本 1</b><span>2026-07-21 14:06 · 8,811字</span></li></ol></aside>}
+              <button className="mint-button" onClick={() => openChapterEditor("add")}>新增章节</button>
+              <button className="mint-button" onClick={() => notify(`已下载《${detailNovelName}》.docx`)}>下载</button>
+            </div>
+            <div className="greenlike-novel-summary">
+              <div className={`greenlike-cover generated ${customCover && isNewDraftDetail ? "custom" : ""}`}>
+                <span>{detailNovelName}</span>
+              </div>
+              <div className="greenlike-summary-copy">
+                <div className="greenlike-title-line">
+                  <h1>{detailNovelName}</h1>
+                  {isNewDraftDetail && <span className="live-status draft">草稿</span>}
+                </div>
+                <div className="greenlike-guide">
+                  <b>导语</b>
+                  <p>{detailNovelIntro}</p>
+                  {isNewDraftDetail && !novelIntro && <small>导入正文后将自动使用文档导语补充</small>}
+                </div>
+              </div>
+            </div>
+            <div className="greenlike-chapter-table">
+              <table>
+                <thead><tr><th>id</th><th>章节</th><th>是否付费</th><th>字数</th><th>更新时间</th><th>操作</th></tr></thead>
+                <tbody>
+                  {detailChapters.map((chapter, index) => <tr key={chapter.id}>
+                    <td>{chapter.id}</td>
+                    <td><b>{chapter.title}</b></td>
+                    <td><span className={index >= 4 ? "chapter-paid" : "chapter-free"}>{index >= 4 ? "付费" : "免费"}</span></td>
+                    <td>{chapter.words}</td>
+                    <td>2026-07-27 14:{18 + index}</td>
+                    <td><button onClick={() => openChapterEditor("edit", index)}>编辑</button><button className="delete" onClick={() => setDeleteChapterId(chapter.id)}>删除</button></td>
+                  </tr>)}
+                </tbody>
+              </table>
+              {detailChapters.length === 0 && <div className="greenlike-empty-table">
+                <div>DOCX</div>
+                <b>暂无章节内容</b>
+                <p>可导入 .doc、.docx 小说文件，或逐章新增内容</p>
+                <button className="mint-button" onClick={openImportNovel}>导入小说</button>
+              </div>}
+            </div>
           </section>}
         </main>
       </div>
@@ -347,6 +425,58 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
             <div className="preview-chapters"><div><b>章节预览</b><span>共 8 章</span></div><table><thead><tr><th>序号</th><th>章节名称</th><th>字数</th><th>识别结果</th></tr></thead><tbody>{importedChapters.slice(0,4).map((chapter,index) => <tr key={chapter.title}><td>{index + 1}</td><td>{chapter.title}</td><td>{chapter.words}</td><td><span>正常</span></td></tr>)}</tbody></table><p>另有 4 章已识别，确认导入后将全部写入。</p></div>
           </div>}
           <div className="novel-modal-footer"><span>{importStage === "upload" ? "选择文件后可预览识别结果" : "请确认章节拆分和导语内容"}</span><button className="soft-button" onClick={() => importStage === "preview" ? setImportStage("upload") : setImportNovelModal(false)}>{importStage === "preview" ? "上一步" : "取消"}</button><button className="mint-button" disabled={importStage === "upload" && !importFileName} onClick={() => importStage === "upload" ? setImportStage("preview") : finishImport()}>{importStage === "upload" ? "预览" : "确认导入"}</button></div>
+        </div>
+      </div>}
+
+      {chapterEditor && <div className="overlay" onClick={() => setChapterEditor(null)}>
+        <div className="chapter-editor-modal" role="dialog" aria-label={chapterEditor.mode === "add" ? "新增章节" : "编辑章节"} onClick={event => event.stopPropagation()}>
+          <div className="chapter-editor-header">
+            <h2>{chapterEditor.mode === "add" ? "新增章节" : "编辑章节"}</h2>
+            <button aria-label="Close" onClick={() => setChapterEditor(null)}>×</button>
+          </div>
+          <div className="chapter-editor-body">
+            <input
+              disabled
+              value={chapterEditor.mode === "add"
+                ? `第${detailChapters.length + 1}章`
+                : (detailChapters[chapterEditor.index]?.title || "章节")}
+              readOnly
+            />
+            <div className="chapter-textarea-wrap">
+              <textarea
+                value={chapterText}
+                onChange={event => setChapterText(event.target.value)}
+                placeholder="这里是小说章节内容，至少100，至多10000字"
+                maxLength={10000}
+              />
+              <span>{chapterText.length}/10000</span>
+            </div>
+          </div>
+          <div className="chapter-editor-footer">
+            <button
+              className="soft-button"
+              disabled={chapterEditor.mode === "add" || chapterEditor.index === 0}
+              onClick={() => switchChapter(-1)}
+            >上一章</button>
+            <button
+              className="soft-button"
+              disabled={chapterEditor.mode === "add" || chapterEditor.index >= detailChapters.length - 1}
+              onClick={() => switchChapter(1)}
+            >下一章</button>
+            <i />
+            <button className="soft-button" onClick={() => setChapterEditor(null)}>取消</button>
+            <button className="mint-button" disabled={chapterText.trim().length < 100} onClick={saveChapter}>保存</button>
+          </div>
+        </div>
+      </div>}
+
+      {deleteChapterId !== null && <div className="overlay" onClick={() => setDeleteChapterId(null)}>
+        <div className="author-delete-dialog" role="dialog" aria-label="删除章节" onClick={event => event.stopPropagation()}>
+          <button className="close" aria-label="Close" onClick={() => setDeleteChapterId(null)}>×</button>
+          <div className="delete-warning">!</div>
+          <p>确认删除 {detailChapters.find(chapter => chapter.id === deleteChapterId)?.title || "该章节"}吗？</p>
+          <span>删除后不可恢复，请谨慎操作。</span>
+          <div><button className="soft-button" onClick={() => setDeleteChapterId(null)}>取消</button><button className="danger-button" onClick={confirmDeleteChapter}>确定</button></div>
         </div>
       </div>}
 
