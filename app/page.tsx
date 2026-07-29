@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type EsignState = "待拟定合同" | "待合同审核" | "待作者签署" | "待法务签章" | "签署完成" | "已拒绝签约";
 type ImportStage = "upload" | "preview";
@@ -95,7 +95,7 @@ const novels = [
 
 const templateControlGroups = [
   { group: "甲方联系人与商业金额", count: 4, source: "企业配置＋责编拟定", handling: "审核通过后由绿台 API 预填并锁定", status: "已映射" },
-  { group: "作者身份、联系方式与收款账户", count: 17, source: "作者签约资料", handling: "申请签约前校验，发起后不可修改", status: "已映射" },
+  { group: "作者身份、联系方式与收款账户", count: 17, source: "作者签约资料", handling: "默认同步；责编拟定时可修订，提交审核后锁定本次合同快照", status: "已映射" },
   { group: "小说与作品信息", count: 8, source: "作者签约申请", handling: "同一字段同步填入合同全部重复位置", status: "已映射" },
   { group: "合同签订日与版权转让日", count: 2, source: "签署结果", handling: "建议使用双方完成签署日，待法务确认", status: "待确认" },
   { group: "身份证正反面附件", count: 2, source: "作者签约资料", handling: "加密读取，预览脱敏，写入最终合同附件", status: "已映射" },
@@ -110,13 +110,55 @@ type PreviewField = {
   tone?: "normal" | "pending" | "sign";
 };
 
+type ContractPrefillValues = {
+  legalName: string;
+  penName: string;
+  mobile: string;
+  idNumber: string;
+  address: string;
+  bankName: string;
+  bankAccount: string;
+};
+
+function amountToChinese(amount: string) {
+  const value = Math.floor(Number(amount.replace(/[^\d.]/g, "")));
+  if (!Number.isFinite(value) || value < 0) return "待填写";
+  if (value === 0) return "零元整";
+  const digits = ["零", "壹", "贰", "叁", "肆", "伍", "陆", "柒", "捌", "玖"];
+  const units = ["", "拾", "佰", "仟", "万", "拾万", "佰万", "仟万", "亿"];
+  const valueText = String(value);
+  let result = "";
+  let zeroPending = false;
+  for (let index = 0; index < valueText.length; index += 1) {
+    const digit = Number(valueText[index]);
+    const position = valueText.length - index - 1;
+    if (digit === 0) {
+      if (result && valueText.slice(index + 1).split("").some(char => char !== "0")) zeroPending = true;
+      continue;
+    }
+    if (zeroPending) {
+      result += "零";
+      zeroPending = false;
+    }
+    result += `${digits[digit]}${units[position] || ""}`;
+  }
+  return `${result}元整`;
+}
+
 function guaranteePreviewFields(
   page: number,
   novelName: string,
   penName: string,
   amount: string,
+  values?: Partial<ContractPrefillValues>,
 ): PreviewField[] {
-  const legalName = "石京";
+  const legalName = values?.legalName || "石京";
+  const authorPenName = values?.penName || penName;
+  const mobile = values?.mobile || "138 **** 6621";
+  const idNumber = values?.idNumber || "3301**********2214";
+  const address = values?.address || "浙江省杭州市西湖区文三路88号";
+  const bankName = values?.bankName || "招商银行杭州文三路支行";
+  const bankAccount = values?.bankAccount || "6225 **** **** 8821";
   const completionDate = "2026年7月22日";
   const contractDate = "双方完成签署日";
 
@@ -126,26 +168,26 @@ function guaranteePreviewFields(
       { left: 19, top: 15.2, value: "0571-8800 6621", width: 20 },
       { left: 28, top: 20.4, value: legalName, width: 29 },
       { left: 24, top: 22.5, value: legalName, width: 20 },
-      { left: 19, top: 24.4, value: "浙江省杭州市西湖区文三路88号", width: 49 },
-      { left: 19, top: 26.4, value: "138 **** 6621", width: 20 },
-      { left: 34, top: 28.4, value: "3301**********2214", width: 25 },
+      { left: 19, top: 24.4, value: address, width: 49 },
+      { left: 19, top: 26.4, value: mobile, width: 20 },
+      { left: 34, top: 28.4, value: idNumber, width: 25 },
       { left: 22, top: 42.9, value: novelName, width: 65 },
       { left: 20, top: 46.9, value: legalName, width: 17 },
-      { left: 48, top: 46.9, value: penName, width: 27 },
-      { left: 14, top: 48.9, value: "3301**********2214", width: 24 },
+      { left: 48, top: 46.9, value: authorPenName, width: 27 },
+      { left: 14, top: 48.9, value: idNumber, width: 24 },
       { left: 22, top: 52.8, value: "88,320", width: 10 },
       { left: 26, top: 56.6, value: completionDate, width: 24 },
     ],
     2: [
       { left: 26, top: 74.1, value: amount.replace(/,/g, ""), width: 12 },
-      { left: 47, top: 74.1, value: "壹万贰仟", width: 28 },
+      { left: 47, top: 74.1, value: amountToChinese(amount), width: 28 },
     ],
     3: [
-      { left: 22, top: 66.5, value: "招商银行杭州文三路支行", width: 57 },
+      { left: 22, top: 66.5, value: bankName, width: 57 },
       { left: 22, top: 68.6, value: legalName, width: 31 },
-      { left: 20, top: 70.6, value: "6225 **** **** 8821", width: 28 },
-      { left: 14, top: 80.3, value: "招商银行杭州文三路支行", width: 36 },
-      { left: 58, top: 80.3, value: "6225 **** **** 8821", width: 30 },
+      { left: 20, top: 70.6, value: bankAccount, width: 28 },
+      { left: 14, top: 80.3, value: bankName, width: 36 },
+      { left: 58, top: 80.3, value: bankAccount, width: 30 },
       { left: 14, top: 82.3, value: legalName, width: 34 },
     ],
     7: [
@@ -159,8 +201,8 @@ function guaranteePreviewFields(
       { left: 22, top: 15.1, value: novelName, width: 64 },
       { left: 22, top: 21.8, value: novelName, width: 65 },
       { left: 20, top: 25.8, value: legalName, width: 18 },
-      { left: 49, top: 25.8, value: penName, width: 28 },
-      { left: 14, top: 27.8, value: "3301**********2214", width: 24 },
+      { left: 49, top: 25.8, value: authorPenName, width: 28 },
+      { left: 14, top: 27.8, value: idNumber, width: 24 },
       { left: 22, top: 31.7, value: "88,320", width: 10 },
       { left: 26, top: 35.7, value: completionDate, width: 24 },
       { left: 45, top: 41.5, value: contractDate, width: 22, tone: "pending" },
@@ -183,8 +225,15 @@ function buyoutPreviewFields(
   novelName: string,
   penName: string,
   amount: string,
+  values?: Partial<ContractPrefillValues>,
 ): PreviewField[] {
-  const legalName = "石京";
+  const legalName = values?.legalName || "石京";
+  const authorPenName = values?.penName || penName;
+  const mobile = values?.mobile || "138 **** 6621";
+  const idNumber = values?.idNumber || "3301**********2214";
+  const address = values?.address || "浙江省杭州市西湖区文三路88号";
+  const bankName = values?.bankName || "招商银行杭州文三路支行";
+  const bankAccount = values?.bankAccount || "6225 **** **** 8821";
   const fields: Record<number, PreviewField[]> = {
     1: [
       { left: 20, top: 9.3, value: "杭州宝茂网络科技有限公司", width: 34 },
@@ -193,27 +242,27 @@ function buyoutPreviewFields(
       { left: 20, top: 14.8, value: "0571-8800 6621", width: 21 },
       { left: 25, top: 16.7, value: "91330110MA2JOWL6XW", width: 27 },
       { left: 22, top: 21.6, value: legalName, width: 17 },
-      { left: 16, top: 23.5, value: "浙江省杭州市西湖区文三路88号", width: 45 },
-      { left: 16, top: 25.3, value: "138 **** 6621", width: 19 },
-      { left: 27, top: 27.2, value: "3301**********2214", width: 27 },
+      { left: 16, top: 23.5, value: address, width: 45 },
+      { left: 16, top: 25.3, value: mobile, width: 19 },
+      { left: 27, top: 27.2, value: idNumber, width: 27 },
       { left: 20, top: 37.7, value: novelName, width: 57 },
       { left: 16, top: 39.7, value: legalName, width: 16 },
-      { left: 42, top: 39.7, value: penName, width: 22 },
+      { left: 42, top: 39.7, value: authorPenName, width: 22 },
       { left: 18, top: 43.5, value: "88,320", width: 11 },
       { left: 20, top: 47.1, value: "2026年7月22日", width: 22 },
     ],
     2: [
-      { left: 53, top: 24.3, value: `人民币 ${amount} 元`, width: 24 },
-      { left: 18, top: 34.1, value: "招商银行杭州文三路支行", width: 34 },
+      { left: 53, top: 24.3, value: `人民币 ${amountToChinese(amount)}`, width: 27 },
+      { left: 18, top: 34.1, value: bankName, width: 34 },
       { left: 18, top: 36.1, value: legalName, width: 17 },
-      { left: 15, top: 38.0, value: "6225 **** **** 8821", width: 25 },
-      { left: 53, top: 47.3, value: "招商银行杭州文三路支行", width: 32 },
-      { left: 68, top: 49.1, value: "6225 **** **** 8821", width: 22 },
+      { left: 15, top: 38.0, value: bankAccount, width: 25 },
+      { left: 53, top: 47.3, value: bankName, width: 32 },
+      { left: 68, top: 49.1, value: bankAccount, width: 22 },
     ],
     5: [
       { left: 14, top: 7.6, value: legalName, width: 14 },
-      { left: 24, top: 7.6, value: penName, width: 16 },
-      { left: 38, top: 7.6, value: "3301**********2214", width: 25 },
+      { left: 24, top: 7.6, value: authorPenName, width: 16 },
+      { left: 38, top: 7.6, value: idNumber, width: 25 },
       { left: 17, top: 12.8, value: "88,320", width: 10 },
       { left: 18, top: 16.1, value: "2026年7月22日", width: 22 },
       { left: 69, top: 68.0, value: "作者签名控件 · 待签署", width: 24, tone: "sign" },
@@ -736,6 +785,16 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
   const [previewPage, setPreviewPage] = useState(1);
   const [draftContractType, setDraftContractType] = useState<"买断" | "保底＋分成">("保底＋分成");
   const [draftAmount, setDraftAmount] = useState("12,000");
+  const [draftAuthor, setDraftAuthor] = useState<ContractPrefillValues>({
+    legalName: "石京",
+    penName: "溪源",
+    mobile: "13812346621",
+    idNumber: "330106199506182214",
+    address: "浙江省杭州市西湖区文三路88号",
+    bankName: "招商银行杭州文三路支行",
+    bankAccount: "6225882100188821",
+  });
+  const draftPageRefs = useRef<Record<number, HTMLElement | null>>({});
   const [draftConfirmed, setDraftConfirmed] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
@@ -767,9 +826,38 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
   const previewTemplateName = draftContractType === "买断"
     ? "短篇小说版权合同（买断）"
     : "【模板】短篇小说版权转让合同（保底＋分成）";
-  const previewPageSrc = draftContractType === "买断"
-    ? `${import.meta.env.BASE_URL}contracts/buyout/page-${previewPage}.jpg`
-    : `${import.meta.env.BASE_URL}contracts/guarantee-share/page-${String(previewPage).padStart(2, "0")}.jpg`;
+  const previewPageSrc = contractPageSrc(previewPage);
+
+  function contractPageSrc(page: number) {
+    return draftContractType === "买断"
+      ? `${import.meta.env.BASE_URL}contracts/buyout/page-${page}.jpg`
+      : `${import.meta.env.BASE_URL}contracts/guarantee-share/page-${String(page).padStart(2, "0")}.jpg`;
+  }
+
+  function updateDraftAuthor(field: keyof ContractPrefillValues, value: string) {
+    setDraftAuthor(current => ({ ...current, [field]: value }));
+    setDraftConfirmed(false);
+  }
+
+  function scrollDraftPreview(page: number) {
+    setPreviewPage(page);
+    draftPageRefs.current[page]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function trackDraftPreviewPage(event: React.UIEvent<HTMLElement>) {
+    const container = event.currentTarget;
+    let closestPage = previewPage;
+    let closestDistance = Number.POSITIVE_INFINITY;
+    Object.entries(draftPageRefs.current).forEach(([page, node]) => {
+      if (!node || Number(page) > previewPageCount) return;
+      const distance = Math.abs(node.offsetTop - container.scrollTop - 18);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestPage = Number(page);
+      }
+    });
+    if (closestPage !== previewPage) setPreviewPage(closestPage);
+  }
 
   function openContractPreview() {
     setPreviewPage(1);
@@ -781,6 +869,15 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     setSelected(index);
     setDraftContractType(novel.contractType as "买断" | "保底＋分成");
     setDraftAmount(novel.price);
+    setDraftAuthor({
+      legalName: "石京",
+      penName: novel.author,
+      mobile: "13812346621",
+      idNumber: "330106199506182214",
+      address: "浙江省杭州市西湖区文三路88号",
+      bankName: "招商银行杭州文三路支行",
+      bankAccount: "6225882100188821",
+    });
     setDraftConfirmed(false);
     setPreviewPage(1);
     setLaunchModal(true);
@@ -1040,29 +1137,38 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 <div className="draft-document-toolbar"><b>{previewTemplateName}</b><span>第 {previewPage} / {previewPageCount} 页　100%</span></div>
                 <div className="draft-document-workspace">
                   <aside>
-                    {Array.from({length: previewPageCount}, (_, index) => index + 1).map(page => <button key={page} className={page === previewPage ? "active" : ""} onClick={() => setPreviewPage(page)}><i>{page}</i><span>第{page}页</span></button>)}
+                    {Array.from({length: previewPageCount}, (_, index) => index + 1).map(page => <button key={page} className={page === previewPage ? "active" : ""} onClick={() => scrollDraftPreview(page)}><i>{page}</i><span>第{page}页</span></button>)}
                   </aside>
-                  <main>
-                    <figure className="template-page">
-                      <img src={previewPageSrc} alt={`${previewTemplateName}第 ${previewPage} 页`}/>
-                      {draftContractType === "保底＋分成" && guaranteePreviewFields(previewPage, selectedNovel.name, selectedNovel.author, draftAmount).map((field, index) => <span key={`${previewPage}-${index}`} className={`template-prefill-value ${field.tone || "normal"}`} style={{ left: `${field.left}%`, top: `${field.top}%`, width: `${field.width || 20}%` }}>{field.value}</span>)}
-                      <div className="draft-preview-mark">合同拟定预览 · 未生效</div>
-                    </figure>
+                  <main onScroll={trackDraftPreviewPage}>
+                    <div className="draft-page-stack">
+                      {Array.from({length: previewPageCount}, (_, index) => index + 1).map(page => <figure key={page} ref={node => {draftPageRefs.current[page] = node;}} className="template-page">
+                        <img src={contractPageSrc(page)} alt={`${previewTemplateName}第 ${page} 页`}/>
+                        {(draftContractType === "保底＋分成"
+                          ? guaranteePreviewFields(page, selectedNovel.name, draftAuthor.penName, draftAmount, draftAuthor)
+                          : buyoutPreviewFields(page, selectedNovel.name, draftAuthor.penName, draftAmount, draftAuthor)
+                        ).map((field, index) => <span key={`${page}-${index}`} className={`template-prefill-value ${field.tone || "normal"}`} style={{ left: `${field.left}%`, top: `${field.top}%`, width: `${field.width || 20}%` }}>{field.value}</span>)}
+                        <div className="draft-preview-mark">合同拟定预览 · 未生效</div>
+                        <figcaption>第 {page} / {previewPageCount} 页</figcaption>
+                      </figure>)}
+                    </div>
                   </main>
                 </div>
               </section>
               <aside className="contract-fill-panel">
-                <div className="fill-panel-heading"><div><h3>填写合同内容</h3><p>带 <b>*</b> 为提交前必须核对的控件</p></div><button onClick={() => setMappingOpen(true)}>查看全部控件</button></div>
+                <div className="fill-panel-heading"><div><h3>填写合同内容</h3><p>右侧独立滚动，修改后左侧合同【】内容实时同步</p></div><button onClick={() => setMappingOpen(true)}>查看全部控件</button></div>
                 <div className="fill-party-label"><i>杭</i><b>杭州宝茂网络科技有限公司</b></div>
-                <label><span><b>*</b> 签约方式</span><select value={draftContractType} onChange={event => {setDraftContractType(event.target.value as "买断" | "保底＋分成");setPreviewPage(1);}}><option>买断</option><option>保底＋分成</option></select></label>
+                <label><span><b>*</b> 签约方式</span><select value={draftContractType} onChange={event => {setDraftContractType(event.target.value as "买断" | "保底＋分成");setPreviewPage(1);setDraftConfirmed(false);}}><option>买断</option><option>保底＋分成</option></select></label>
                 <label><span><b>*</b> 合同模板</span><input value={previewTemplateName} readOnly/></label>
-                <label><span><b>*</b> {draftContractType === "买断" ? "固定版权费用" : "税前保底费用"}</span><input value={`¥ ${draftAmount}`} onChange={event => setDraftAmount(event.target.value.replace(/[^\d,.]/g, ""))}/></label>
+                <label><span><b>*</b> {draftContractType === "买断" ? "固定版权费用" : "税前保底费用"}</span><input value={`¥ ${draftAmount}`} onChange={event => {setDraftAmount(event.target.value.replace(/[^\d,.]/g, ""));setDraftConfirmed(false);}}/></label>
                 <label><span><b>*</b> 小说名称</span><input value={selectedNovel.name} readOnly/></label>
-                <label><span><b>*</b> 作者实名 / 笔名</span><input value={`石＊京 / ${selectedNovel.author}`} readOnly/></label>
-                <label><span><b>*</b> 作者手机号</span><input value="138 **** 6621" readOnly/></label>
-                <label><span><b>*</b> 身份证号</span><input value="3301 ********** 2214" readOnly/></label>
-                <label><span><b>*</b> 开户行</span><input value="招商银行杭州文三路支行" readOnly/></label>
-                <label><span><b>*</b> 银行卡号</span><input value="6225 **** **** 8821" readOnly/></label>
+                <div className="author-sync-heading"><div><b>作者信息</b><span>来自作者投稿后台</span></div><small>责编可重新编辑，保存时覆盖本次合同快照</small></div>
+                <label><span><b>*</b> 作者实名</span><input value={draftAuthor.legalName} onChange={event => updateDraftAuthor("legalName", event.target.value)}/></label>
+                <label><span><b>*</b> 作者笔名</span><input value={draftAuthor.penName} onChange={event => updateDraftAuthor("penName", event.target.value)}/></label>
+                <label><span><b>*</b> 作者手机号</span><input value={draftAuthor.mobile} onChange={event => updateDraftAuthor("mobile", event.target.value)}/></label>
+                <label><span><b>*</b> 身份证号</span><input value={draftAuthor.idNumber} onChange={event => updateDraftAuthor("idNumber", event.target.value)}/></label>
+                <label><span><b>*</b> 联系地址</span><input value={draftAuthor.address} onChange={event => updateDraftAuthor("address", event.target.value)}/></label>
+                <label><span><b>*</b> 开户行</span><input value={draftAuthor.bankName} onChange={event => updateDraftAuthor("bankName", event.target.value)}/></label>
+                <label><span><b>*</b> 银行卡号</span><input value={draftAuthor.bankAccount} onChange={event => updateDraftAuthor("bankAccount", event.target.value)}/></label>
                 <label><span><b>*</b> 财务审核人</span><select><option>财务·林晓曼</option></select></label>
                 <div className="fill-sign-order"><b>签署顺序</b><span>财务审核 → 作者签字 → 法务签章</span></div>
                 <label className="control-confirm-check"><input type="checkbox" checked={draftConfirmed} onChange={event => setDraftConfirmed(event.target.checked)}/><span>我已对照左侧合同原文，核对上述填写控件准确无误</span></label>
