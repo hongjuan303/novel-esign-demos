@@ -1,87 +1,81 @@
 import assert from "node:assert/strict";
-import { access, readFile, readdir } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
-const developmentPreviewMeta =
-  /<meta(?=[^>]*\bname=["']codex-preview["'])(?=[^>]*\bcontent=["']development["'])[^>]*>/i;
-const templateRoot = new URL("../", import.meta.url);
-const previewRoot = new URL("../app/_sites-preview/", import.meta.url);
+const projectRoot = new URL("../", import.meta.url);
+const outputRoot = new URL("../out/", import.meta.url);
+const pagesBase = "/html-prototypes/novel-esign-demos/";
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  return worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
+async function readOutputAssets() {
+  const files = await readdir(new URL("assets/", outputRoot));
+  const jsFile = files.find((file) => file.endsWith(".js"));
+  const cssFile = files.find((file) => file.endsWith(".css"));
+  assert.ok(jsFile, "Pages build must emit a JavaScript bundle");
+  assert.ok(cssFile, "Pages build must emit a CSS bundle");
+  const [javascript, css] = await Promise.all([
+    readFile(new URL(`assets/${jsFile}`, outputRoot), "utf8"),
+    readFile(new URL(`assets/${cssFile}`, outputRoot), "utf8"),
+  ]);
+  return { files, javascript, css };
 }
 
-test("server-renders the starter loading skeleton", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-
-  const html = await response.text();
-  assert.match(html, developmentPreviewMeta);
-  assert.match(html, /<title>Your site is taking shape<\/title>/i);
-  assert.match(html, /Codex is working/);
-  assert.match(html, /Your site is taking shape/);
-  assert.match(html, /Codex is building the first version/);
-  assert.match(html, /react-loading-skeleton/);
-  assert.match(html, /role="status"/);
+test("builds a GitHub Pages entry with the required repository base path", async () => {
+  const html = await readFile(new URL("index.html", outputRoot), "utf8");
+  assert.match(html, /<html lang="zh-CN">/);
+  assert.match(html, /<title>小说电子签全链路原型<\/title>/);
+  assert.match(html, new RegExp(`${pagesBase}assets/[^"]+\\.js`));
+  assert.match(html, new RegExp(`${pagesBase}assets/[^"]+\\.css`));
+  assert.doesNotMatch(html, /src="\/assets\//);
+  assert.doesNotMatch(html, /href="\/assets\//);
 });
 
-test("keeps the loading skeleton scoped and disposable", async () => {
-  const [preview, css, page, layout, packageJson, files] = await Promise.all([
-    readFile(new URL("SkeletonPreview.tsx", previewRoot), "utf8"),
-    readFile(new URL("preview.css", previewRoot), "utf8"),
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
-    readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readdir(previewRoot),
+test("ships both author and internal-admin flows in the production bundle", async () => {
+  const { javascript } = await readOutputAssets();
+  for (const requiredText of [
+    "作者投稿后台",
+    "内部绿台",
+    "作品管理",
+    "收益管理",
+    "签约管理",
+    "拟定合同",
+    "提交财务审核",
+    "审核驳回",
+    "审核通过",
+    "法务选择印章",
+    "签约管理选择",
+    "设置付费",
+  ]) {
+    assert.match(javascript, new RegExp(requiredText));
+  }
+});
+
+test("keeps the contract preview and control panel independently scrollable", async () => {
+  const [{ css }, page] = await Promise.all([
+    readOutputAssets(),
+    readFile(new URL("app/page.tsx", projectRoot), "utf8"),
   ]);
-
-  assert.deepEqual(files.sort(), ["SkeletonPreview.tsx", "preview.css"]);
-  assert.match(preview, /from "react-loading-skeleton"/);
-  assert.match(preview, /baseColor="#eceae7"/);
-  assert.match(preview, /highlightColor="#f9f8f6"/);
-  assert.match(preview, /duration=\{2\.8\}/);
-  assert.match(preview, /sites-skeleton-search-placeholder/);
-  assert.match(packageJson, /"react-loading-skeleton": "3\.5\.0"/);
-
-  const shellIndex = preview.indexOf('className="sites-skeleton-shell"');
-  const statusIndex = preview.indexOf('className="sites-skeleton-status"');
-  assert.ok(shellIndex >= 0 && statusIndex > shellIndex);
-  assert.match(css, /position:\s*fixed/);
-  assert.match(css, /inset:\s*0/);
-  assert.match(css, /opacity:\s*0\.52/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.doesNotMatch(css, /#020617|canvas|pets|progress/i);
-  assert.doesNotMatch(
-    preview,
-    /loading-spinner|status-mark|status-progress|canvas|cookie|random/i,
+  assert.match(page, /draft-page-stack/);
+  assert.match(page, /合同填写控件，可上下滚动查看全部字段/);
+  assert.match(page, /author-sync-heading/);
+  assert.match(
+    css,
+    /\.contract-fill-panel\{[^}]*(?:overflow-y:scroll|overflow:hidden scroll)/,
   );
-
-  assert.match(page, /export const metadata:\s*Metadata/);
-  assert.match(page, /"codex-preview": "development"/);
-  assert.match(page, /<SkeletonPreview \/>/);
-  assert.match(layout, /title:\s*"Starter Project"/);
-  assert.doesNotMatch(layout, /codex-preview|_sites-preview|themeColor|\bViewport\b/);
-  assert.doesNotMatch(css, /(^|\s)(html|body)\s*\{/m);
-
-  await assert.rejects(
-    access(new URL("public/_sites-preview", templateRoot)),
+  assert.match(
+    css,
+    /\.draft-document-workspace>main\{[^}]*(?:overflow-y:auto|overflow:hidden auto)/,
   );
+});
+
+test("matches the confirmed author work and income rules", async () => {
+  const page = await readFile(new URL("app/page.tsx", projectRoot), "utf8");
+  assert.match(
+    page,
+    /草稿[\s\S]*待签约[\s\S]*签约中[\s\S]*签约完成/,
+  );
+  assert.match(page, /申请签约/);
+  assert.match(page, /查看进度/);
+  assert.match(page, /小说详情/);
+  assert.match(page, /签约日期/);
+  assert.doesNotMatch(page, /到账状态/);
 });
