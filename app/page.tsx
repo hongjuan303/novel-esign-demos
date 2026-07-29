@@ -178,6 +178,52 @@ function guaranteePreviewFields(
   return fields[page] || [];
 }
 
+function buyoutPreviewFields(
+  page: number,
+  novelName: string,
+  penName: string,
+  amount: string,
+): PreviewField[] {
+  const legalName = "石京";
+  const fields: Record<number, PreviewField[]> = {
+    1: [
+      { left: 20, top: 9.3, value: "杭州宝茂网络科技有限公司", width: 34 },
+      { left: 20, top: 11.1, value: "凌文涛", width: 13 },
+      { left: 20, top: 12.9, value: "浙江省杭州市西湖区文三路88号", width: 42 },
+      { left: 20, top: 14.8, value: "0571-8800 6621", width: 21 },
+      { left: 25, top: 16.7, value: "91330110MA2JOWL6XW", width: 27 },
+      { left: 22, top: 21.6, value: legalName, width: 17 },
+      { left: 16, top: 23.5, value: "浙江省杭州市西湖区文三路88号", width: 45 },
+      { left: 16, top: 25.3, value: "138 **** 6621", width: 19 },
+      { left: 27, top: 27.2, value: "3301**********2214", width: 27 },
+      { left: 20, top: 37.7, value: novelName, width: 57 },
+      { left: 16, top: 39.7, value: legalName, width: 16 },
+      { left: 42, top: 39.7, value: penName, width: 22 },
+      { left: 18, top: 43.5, value: "88,320", width: 11 },
+      { left: 20, top: 47.1, value: "2026年7月22日", width: 22 },
+    ],
+    2: [
+      { left: 53, top: 24.3, value: `人民币 ${amount} 元`, width: 24 },
+      { left: 18, top: 34.1, value: "招商银行杭州文三路支行", width: 34 },
+      { left: 18, top: 36.1, value: legalName, width: 17 },
+      { left: 15, top: 38.0, value: "6225 **** **** 8821", width: 25 },
+      { left: 53, top: 47.3, value: "招商银行杭州文三路支行", width: 32 },
+      { left: 68, top: 49.1, value: "6225 **** **** 8821", width: 22 },
+    ],
+    5: [
+      { left: 14, top: 7.6, value: legalName, width: 14 },
+      { left: 24, top: 7.6, value: penName, width: 16 },
+      { left: 38, top: 7.6, value: "3301**********2214", width: 25 },
+      { left: 17, top: 12.8, value: "88,320", width: 10 },
+      { left: 18, top: 16.1, value: "2026年7月22日", width: 22 },
+      { left: 69, top: 68.0, value: "作者签名控件 · 待签署", width: 24, tone: "sign" },
+      { left: 67, top: 71.3, value: "签署日期由腾讯生成", width: 26, tone: "sign" },
+    ],
+  };
+
+  return fields[page] || [];
+}
+
 function Badge({ children, tone = "blue" }: { children: React.ReactNode; tone?: "blue" | "green" | "orange" | "gray" }) {
   return <span className={`badge ${tone}`}>{children}</span>;
 }
@@ -692,6 +738,8 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
   const [draftAmount, setDraftAmount] = useState("12,000");
   const [draftConfirmed, setDraftConfirmed] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectSigningOpen, setRejectSigningOpen] = useState(false);
@@ -753,6 +801,8 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     next[selected] = "待作者签署";
     setStates(next);
     setDetailOpen(false);
+    setReviewOpen(false);
+    setApproveConfirmOpen(false);
     setToast("财务审核通过，合同已自动同步至作者投稿后台");
     setTimeout(() => setToast(""), 3200);
   }
@@ -764,6 +814,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     setStates(next);
     setRejectModal(false);
     setDetailOpen(false);
+    setReviewOpen(false);
     setRejectReason("");
     setToast("合同已驳回责编修改，驳回意见已记录");
     setTimeout(() => setToast(""), 3200);
@@ -774,7 +825,8 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     setSelected(index);
     setDraftContractType(novel.contractType as "买断" | "保底＋分成");
     setDraftAmount(novel.price);
-    setDetailOpen(true);
+    setPreviewPage(1);
+    setReviewOpen(true);
   }
 
   function openNovelPreview(index: number) {
@@ -1084,6 +1136,61 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
           <footer><span>{newNovelMode === "manual" ? "默认手动录入" : `已选择 ${selectedSigningNovelIds.length} 本小说`}</span><button className="secondary" onClick={() => setNewNovelModalOpen(false)}>取消</button>{newNovelMode === "manual" ? <button className="primary" disabled={!manualNovelName.trim() || !manualNovelAuthor.trim()} onClick={confirmManualNovel}>确定新建</button> : <button className="primary" disabled={selectedSigningNovelIds.length === 0} onClick={confirmSigningNovelSelection}>确认选择</button>}</footer>
         </div>
       </div>}
+      {reviewOpen && <div className="overlay contract-review-overlay" onClick={() => setReviewOpen(false)}>
+        <div className="contract-review-modal" onClick={event => event.stopPropagation()}>
+          <header className="contract-review-header">
+            <div><h2>审核合同</h2><p>《{selectedNovel.name}》· {previewTemplateName}</p></div>
+            <span><i>✓</i> 腾讯电子签已返回填充完成的合同</span>
+            <button className="close" onClick={() => setReviewOpen(false)}>×</button>
+          </header>
+          <div className="contract-review-body">
+            <aside className="review-page-nav">
+              <b>共 {previewPageCount} 页</b>
+              {Array.from({length: previewPageCount}, (_, index) => index + 1).map(page => <button key={page} className={page === previewPage ? "active" : ""} onClick={() => setPreviewPage(page)}><i>{page}</i><span>第 {page} 页</span></button>)}
+            </aside>
+            <main className="review-contract-stage">
+              <div className="review-contract-toolbar"><span>－　100%　＋</span><b>合同控件已填充 · 只读审核</b></div>
+              <figure className="template-page">
+                <img src={previewPageSrc} alt={`腾讯电子签返回合同第 ${previewPage} 页`}/>
+                {(draftContractType === "保底＋分成"
+                  ? guaranteePreviewFields(previewPage, selectedNovel.name, selectedNovel.author, draftAmount)
+                  : buyoutPreviewFields(previewPage, selectedNovel.name, selectedNovel.author, draftAmount)
+                ).map((field, index) => <span key={`review-${previewPage}-${index}`} className={`template-prefill-value ${field.tone || "normal"}`} style={{ left: `${field.left}%`, top: `${field.top}%`, width: `${field.width || 20}%` }}>{field.value}</span>)}
+                <div className="review-return-watermark">腾讯电子签合同预览</div>
+                <figcaption>第 {previewPage} / {previewPageCount} 页 · 腾讯电子签返回文件</figcaption>
+              </figure>
+            </main>
+            <aside className="review-contract-info">
+              <h3>合同审核信息</h3>
+              <div className="review-return-status"><i>✓</i><span><b>控件填充完成</b><small>腾讯电子签文档合成成功</small></span></div>
+              <dl>
+                <div><dt>合同版本</dt><dd>V1</dd></div>
+                <div><dt>签约方式</dt><dd>{selectedNovel.contractType}</dd></div>
+                <div><dt>签约金额</dt><dd>¥{selectedNovel.price}</dd></div>
+                <div><dt>作者</dt><dd>石＊京 / {selectedNovel.author}</dd></div>
+                <div><dt>责编</dt><dd>{selectedNovel.owner}</dd></div>
+                <div><dt>财务审核人</dt><dd>财务·林晓曼</dd></div>
+              </dl>
+              <div className="review-readonly-tip"><b>审核说明</b><span>本页面只读展示腾讯电子签返回的已填充合同。若内容有误，请审核驳回并由责编重新拟定。</span></div>
+            </aside>
+          </div>
+          <footer className="contract-review-footer">
+            <span>审核操作将写入合同流转记录</span>
+            <button className="secondary review-reject-action" onClick={() => {setRejectReason("");setRejectModal(true);}}>审核驳回</button>
+            <button className="primary" onClick={() => setApproveConfirmOpen(true)}>审核通过</button>
+          </footer>
+        </div>
+      </div>}
+      {approveConfirmOpen && <div className="overlay review-confirm-overlay" onClick={() => setApproveConfirmOpen(false)}>
+        <div className="review-approve-confirm" onClick={event => event.stopPropagation()}>
+          <button className="close" onClick={() => setApproveConfirmOpen(false)}>×</button>
+          <div className="review-confirm-icon">?</div>
+          <h2>确认合同审核无误？</h2>
+          <p>确认后合同即同步给作者签约。</p>
+          <div className="review-confirm-summary"><span>小说名称</span><b>《{selectedNovel.name}》</b><span>合同金额</span><b>¥{selectedNovel.price}</b></div>
+          <div className="modal-actions"><button className="secondary" onClick={() => setApproveConfirmOpen(false)}>取消</button><button className="primary" onClick={approveContract}>确认审核通过</button></div>
+        </div>
+      </div>}
       {detailOpen && (
         <div className="overlay side" onClick={() => setDetailOpen(false)}>
           <aside className="contract-drawer" onClick={event => event.stopPropagation()}>
@@ -1196,8 +1303,8 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
       {rejectModal && <div className="overlay review-overlay" onClick={() => setRejectModal(false)}>
         <div className="review-reject-modal" onClick={event => event.stopPropagation()}>
           <button className="close" onClick={() => setRejectModal(false)}>×</button>
-          <h2>财务驳回合同</h2>
-          <p>驳回后合同返回责编的「待拟定合同」，财务审核意见将写入流转记录。</p>
+          <h2>审核驳回</h2>
+          <p>请填写驳回原因。确认后合同返回责编重新拟定，审核意见将写入流转记录。</p>
           <label><span><b>*</b> 驳回原因</span><textarea value={rejectReason} onChange={event => setRejectReason(event.target.value)} maxLength={300} placeholder="请说明需要修改的合同条款或信息"/><small>{rejectReason.length}/300</small></label>
           <div className="modal-actions"><button className="secondary" onClick={() => setRejectModal(false)}>取消</button><button className="danger-button" disabled={!rejectReason.trim()} onClick={rejectContract}>确认驳回</button></div>
         </div>
