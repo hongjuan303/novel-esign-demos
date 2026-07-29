@@ -220,7 +220,7 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
   const stateCopy = {
     待拟定合同: { label: "待签约", detail: "签约申请已提交，责编正在拟定电子合同", action: "查看进度" },
     待合同审核: { label: "待签约", detail: "合同正在内部审核，审核通过后将自动发送给作者", action: "查看进度" },
-    待作者签署: { label: "签约中", detail: "电子合同待作者签署 · 截止 2026-07-30", action: "查看进度" },
+    待作者签署: { label: "签约中", detail: "电子合同待作者签署", action: "查看进度" },
     待法务签章: { label: "签约中", detail: "作者已签署，等待法务完成企业签章", action: "查看进度" },
     签署完成: { label: "签约完成", detail: "作者签署与法务签章已完成 · QS202607230018", action: "小说详情" },
   }[state];
@@ -452,11 +452,11 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
 
           {view === "income" && <>
             <section className="author-page-card">
-              <div className="author-income-filter"><input placeholder="开始日期"/><span>→</span><input placeholder="结束日期"/><input placeholder="小说名称"/><select><option>到账状态</option><option>待到账</option><option>已到账</option></select><button className="mint-button">查 询</button></div>
-              <table className="author-income-table"><thead><tr><th>合同ID</th><th>小说名称</th><th>签约性质</th><th>税前收入(元)</th><th>到账状态</th><th>签约日期</th><th>操作</th></tr></thead>
+              <div className="author-income-filter"><input placeholder="签约完成开始日期"/><span>→</span><input placeholder="签约完成结束日期"/><input placeholder="小说名称"/><button className="mint-button">查 询</button></div>
+              <table className="author-income-table"><thead><tr><th>合同ID</th><th>小说名称</th><th>签约性质</th><th>税前收入(元)</th><th title="作者签字与企业签章全部完成的日期">签约日期</th><th>操作</th></tr></thead>
                 <tbody>
-                  {state === "签署完成" && <tr><td><button onClick={() => setSignModal(true)}>QS202607230018</button></td><td>声声已离商音近</td><td>保底＋分成</td><td>12,000.00</td><td><span className="income-state pending">待到账</span></td><td>2026-07-23</td><td><button onClick={() => setSignModal(true)}>查看合同</button></td></tr>}
-                  <tr><td><button onClick={() => notify("已打开业务手动上传的历史合同")}>ESIGN-2025-1046</button></td><td>月光落在旧站台</td><td>买断</td><td>15,000.00</td><td><span className="income-state paid">已到账</span></td><td>2025-12-31</td><td><button onClick={() => notify("已打开历史线下合同")}>查看合同</button></td></tr>
+                  {state === "签署完成" && <tr><td><button onClick={() => setSignModal(true)}>QS202607230018</button></td><td>声声已离商音近</td><td>保底＋分成</td><td>12,000.00</td><td>2026-07-23</td><td><button onClick={() => setSignModal(true)}>查看合同</button></td></tr>}
+                  <tr><td><button onClick={() => notify("已打开业务手动上传的历史合同")}>ESIGN-2025-1046</button></td><td>月光落在旧站台</td><td>买断</td><td>15,000.00</td><td>2025-12-31</td><td><button onClick={() => notify("已打开历史线下合同")}>查看合同</button></td></tr>
                 </tbody>
               </table>
             </section>
@@ -669,7 +669,7 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
 
       {signModal && <div className="overlay" onClick={() => setSignModal(false)}><div className="author-contract-modal live-style" onClick={event => event.stopPropagation()}>
         <button className="close" onClick={() => setSignModal(false)}>×</button><div className="tencent-mark">✓ 腾讯电子签</div><h2>{state === "待作者签署" ? "签署前确认" : "电子合同详情"}</h2><p>《声声已离商音近》版权转让合同（保底＋分成）</p>
-        <div className="contract-summary"><div><span>签约方式</span><b>保底＋分成</b></div><div><span>税前保底费用</span><b className="money">¥12,000.00</b></div><div><span>甲方</span><b>杭州宝茂网络科技有限公司</b></div><div><span>乙方</span><b>石＊京（笔名：溪源）</b></div><div><span>签署顺序</span><b>作者先签 → 法务签章</b></div><div><span>签署截止</span><b>2026-07-30 23:59</b></div></div>
+        <div className="contract-summary"><div><span>签约方式</span><b>保底＋分成</b></div><div><span>税前保底费用</span><b className="money">¥12,000.00</b></div><div><span>甲方</span><b>杭州宝茂网络科技有限公司</b></div><div><span>乙方</span><b>石＊京（笔名：溪源）</b></div><div><span>签署顺序</span><b>作者先签 → 法务签章</b></div></div>
         <div className="author-prefill-result"><i>✓</i><div><b>合同信息已自动带入</b><span>实名、小说、金额、收款账户等内容已由绿台预填并锁定，作者无需重复填写，只需核对合同并完成两处签名。</span></div></div>
         <div className="signature-scope"><b>本次需完成 2 处签名</b><span>① 主合同签署页　② 附件《版权转让声明函》</span></div><div className="safe-note">签署将在腾讯电子签安全页面完成，返回后以服务端回调更新最终状态。</div>
         {state === "待作者签署" && <><label className="agreement"><input type="checkbox" defaultChecked/> 我已核对合同主体、保底费用和分成规则</label><button className="mint-button wide" disabled={signing} onClick={completeAuthorSign}>{signing ? "正在同步签署结果…" : "前往腾讯电子签"}</button></>}
@@ -689,7 +689,6 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
   const [previewPage, setPreviewPage] = useState(1);
   const [draftContractType, setDraftContractType] = useState<"买断" | "保底＋分成">("保底＋分成");
   const [draftAmount, setDraftAmount] = useState("12,000");
-  const [draftDeadline, setDraftDeadline] = useState("2026-07-30 23:59");
   const [detailOpen, setDetailOpen] = useState(false);
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -719,7 +718,6 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     setSelected(index);
     setDraftContractType(novel.contractType as "买断" | "保底＋分成");
     setDraftAmount(novel.price);
-    setDraftDeadline("2026-07-30 23:59");
     setLaunchModal(true);
   }
 
@@ -758,7 +756,6 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     setSelected(index);
     setDraftContractType(novel.contractType as "买断" | "保底＋分成");
     setDraftAmount(novel.price);
-    setDraftDeadline("2026-07-30 23:59");
     setDetailOpen(true);
   }
 
@@ -825,7 +822,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
             </section>
             <div className="table-toolbar contract-list-toolbar"><span>审核角色暂称「合同审核人」，后续可配置为法务或经管人员；数据权限沿用小说管理。</span></div>
             <section className="live-table-wrap">
-                <table className="live-table contract-list-table"><thead><tr><th>签约单号</th><th>小说名称</th><th>作者</th><th>合同类型</th><th>签约金额</th><th>签约主体</th><th>责编</th><th>合同审核人</th><th>签约状态</th><th>签署截止</th><th>更新时间</th><th>操作</th></tr></thead>
+                <table className="live-table contract-list-table"><thead><tr><th>签约单号</th><th>小说名称</th><th>作者</th><th>合同类型</th><th>签约金额</th><th>签约主体</th><th>责编</th><th>合同审核人</th><th>签约状态</th><th>更新时间</th><th>操作</th></tr></thead>
                   <tbody>{novels.map((novel, index) => {
                     const rowState = states[index];
                     return <tr key={novel.id}>
@@ -838,7 +835,6 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                       <td>{novel.owner}</td>
                       <td>{novel.legacy ? "-" : "待配置"}</td>
                       <td>{novel.legacy ? <Badge tone="gray">线下已归档</Badge> : <Badge tone={rowState === "签署完成" ? "green" : rowState === "待拟定合同" ? "blue" : "orange"}>{rowState}</Badge>}</td>
-                      <td>{rowState === "签署完成" ? "-" : "2026-07-30 23:59"}</td>
                       <td>07-27 14:{20 + index}</td>
                       <td><div className="row-actions">
                         {novel.legacy ? <button onClick={() => showContract(index)}>查看合同</button> :
@@ -857,18 +853,18 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
           <div className="green-tab">小说管理　×</div>
           <section className="green-filters">
             <label>小说ID<input placeholder="请输入"/></label><label>小说名称<input placeholder="请输入"/></label><label>作者笔名<input placeholder="请输入"/></label>
-            <label>小说状态<select><option>全部</option></select></label><label>责编<select><option>请选择</option></select></label><label>签约状态<select><option>全部</option><option>待拟定合同</option><option>待合同审核</option><option>待作者签署</option><option>待法务签章</option><option>签署完成</option><option>历史线下</option></select></label>
+            <label>小说状态<select><option>全部</option></select></label><label>责编<select><option>请选择</option></select></label>
             <label>部门<select><option>全部</option></select></label><label>创建日期<input placeholder="开始日期　至　结束日期"/></label>
             <div className="filter-actions"><button className="primary small">查询</button><button className="secondary small">重置</button><button className="secondary small">导出</button></div>
           </section>
-          <div className="table-toolbar"><button className="primary small">新建小说</button><span>签约任务统一在「签约管理」处理，小说管理保留合同状态与归档文件</span></div>
+          <div className="table-toolbar"><button className="primary small">新建小说</button><span>本期电子签拟定、审核、签署跟踪与合同查看统一在「签约管理」处理</span></div>
           <section className="live-table-wrap">
-            <table className="live-table"><thead><tr><th>小说ID</th><th>小说名称</th><th>封面</th><th>作者</th><th>编辑</th><th>责编</th><th>部门</th><th>上架类型</th><th>版权类型</th><th>版权文件</th><th>签约状态</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+            <table className="live-table"><thead><tr><th>小说ID</th><th>小说名称</th><th>封面</th><th>作者</th><th>编辑</th><th>责编</th><th>部门</th><th>上架类型</th><th>版权类型</th><th>版权文件</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
               <tbody>{novels.map((novel, index) => <tr key={novel.id} className={selected === index ? "selected-row" : ""} onClick={() => setSelected(index)}>
                 <td>{novel.id}</td><td><button className="novel-link">{novel.name}</button></td><td><span className={`tiny-cover cover-${index}`}>{novel.name.slice(0,2)}</span></td><td>{novel.author}</td><td>{novel.editor}</td><td>{novel.owner}</td><td>{novel.department}</td><td>签约</td><td>自有版权</td>
                 <td>{novel.legacy ? <button className="file-link" onClick={event => { event.stopPropagation(); setToast("已打开业务手动上传的历史线下合同"); }}>历史合同-{novel.id}.pdf</button> : states[index] === "签署完成" ? <span className="file-stack"><button className="file-link">已签合同.pdf</button><button className="file-link">证据报告.pdf</button><small>2 / 5</small></span> : "-"}</td>
-                <td>{novel.legacy ? <Badge tone="gray">历史线下已上传</Badge> : <Badge tone={states[index] === "签署完成" ? "green" : states[index] === "待拟定合同" ? "blue" : "orange"}>{states[index]}</Badge>}</td><td><span className="online-dot"/>上架</td><td>{novel.createdAt}</td>
-                <td><div className="row-actions"><button>修改</button><button>克隆</button>{novel.legacy ? <button className="sign-action" onClick={event => {event.stopPropagation();showContract(index);}}>查看线下合同</button> : states[index] === "待拟定合同" ? <button className="sign-action" onClick={event => {event.stopPropagation();openDraftContract(index);}}>拟定合同</button> : <button className="sign-action" onClick={event => {event.stopPropagation();showContract(index);}}>查看签约</button>}</div></td>
+                <td><span className="online-dot"/>上架</td><td>{novel.createdAt}</td>
+                <td><div className="row-actions"><button>修改</button><button>克隆</button></div></td>
               </tr>)}</tbody>
             </table>
           </section>
@@ -892,7 +888,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
               <label>主合同作者签名控件<input value="签署页 · 乙方签字" readOnly/></label><label>声明函作者签名控件<input value="声明人签字" readOnly/></label>
               {draftContractType !== "买断" && <><label>收益分成期限<input value="1 年" readOnly/></label><label>结算频率<input value="按月结算" readOnly/></label></>}
               {draftContractType !== "买断" && <label>合同日期口径<input value="双方完成签署日（建议，待法务确认）" readOnly/></label>}
-              <label>签署截止日期<input value={draftDeadline} onChange={event => setDraftDeadline(event.target.value)}/></label><label>合同通知<select><option>投稿后台＋短信</option></select></label>
+              <label>合同通知<select><option>投稿后台＋短信</option></select></label>
             </div>
             {draftContractType !== "买断" && <div className="template-control-check">
               <header><div><b>腾讯模板控件校验</b><span>已识别 10 页、38 个必填控件</span></div><button onClick={() => setMappingOpen(true)}>查看 38 项映射</button></header>
@@ -941,7 +937,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 <li><b>作者提交签约申请</b><span>{selectedNovel.author} · 实名与签约资料校验通过</span></li>
                 <li><b>责编拟定并提交合同</b><span>{selectedNovel.owner} · 模板、稿费与签署顺序已保存</span></li>
                 <li><b>{selectedState === "待合同审核" ? "等待合同审核" : "合同审核通过"}</b><span>{selectedState === "待合同审核" ? "审核角色可配置为法务或经管人员" : "通过后已自动创建电子签流程并发送作者"}</span></li>
-                <li><b>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "作者签署尚未开始" : selectedState === "待作者签署" ? "等待作者签署" : "作者签署完成"}</b><span>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "合同审核通过后自动发送作者" : selectedState === "待作者签署" ? "截止 2026-07-30 23:59" : "主合同与声明函签名控件均完成"}</span></li>
+                <li><b>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "作者签署尚未开始" : selectedState === "待作者签署" ? "等待作者签署" : "作者签署完成"}</b><span>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "合同审核通过后自动发送作者" : selectedState === "待作者签署" ? "电子合同已同步至作者投稿后台" : "主合同与声明函签名控件均完成"}</span></li>
                 <li><b>{selectedState === "签署完成" ? "法务签章完成并归档" : "等待法务手动签章"}</b><span>{selectedState === "签署完成" ? "腾讯回调成功后，合同 PDF 与证据报告已回写版权文件" : "两名有权法务均可处理；点击签章时原子占用，另一人不可重复进入"}</span></li>
               </ol>
             </>}
@@ -995,7 +991,6 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 <div><dt>作者实名</dt><dd>石＊京</dd></div>
                 <div><dt>签约金额</dt><dd>¥{draftAmount}</dd></div>
                 <div><dt>签约主体</dt><dd>杭州宝茂网络科技有限公司</dd></div>
-                <div><dt>签署截止</dt><dd>{draftDeadline}</dd></div>
               </dl>
               {draftContractType === "保底＋分成" && <div className="preview-control-summary">
                 <span><b>31</b>项业务数据已预填</span>
