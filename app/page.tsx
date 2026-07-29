@@ -1154,7 +1154,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                   </main>
                 </div>
               </section>
-              <aside className="contract-fill-panel">
+              <aside className="contract-fill-panel" aria-label="合同填写控件，可上下滚动查看全部字段" tabIndex={0}>
                 <div className="fill-panel-heading"><div><h3>填写合同内容</h3><p>右侧独立滚动，修改后左侧合同【】内容实时同步</p></div><button onClick={() => setMappingOpen(true)}>查看全部控件</button></div>
                 <div className="fill-party-label"><i>杭</i><b>杭州宝茂网络科技有限公司</b></div>
                 <label><span><b>*</b> 签约方式</span><select value={draftContractType} onChange={event => {setDraftContractType(event.target.value as "买断" | "保底＋分成");setPreviewPage(1);setDraftConfirmed(false);}}><option>买断</option><option>保底＋分成</option></select></label>
