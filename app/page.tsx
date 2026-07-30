@@ -999,7 +999,6 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
   const [mappingOpen, setMappingOpen] = useState(false);
   const [legalSealOpen, setLegalSealOpen] = useState(false);
   const [selectedSeal, setSelectedSeal] = useState<SealName>("杭州宝茂网络科技有限公司合同专用章");
-  const [legalLock, setLegalLock] = useState<{ operator: string; occupiedAt: string } | null>(null);
   const [legalSealProcessing, setLegalSealProcessing] = useState(false);
   const [newNovelModalOpen, setNewNovelModalOpen] = useState(false);
   const [newNovelMode, setNewNovelMode] = useState<"manual" | "signing">("manual");
@@ -1192,26 +1191,18 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     setSelected(index);
     setDraftContractType(novels[index].contractType as "买断" | "保底＋分成");
     setSelectedSeal("杭州宝茂网络科技有限公司合同专用章");
-    setLegalLock({ operator: "法务人员A", occupiedAt: "2026-07-29 20:18:06" });
     setLegalSealOpen(true);
   }
 
   function openLegalSeal() {
-    if (legalLock && legalLock.operator !== "法务人员A") {
-      setToast(`该合同正在由${legalLock.operator}签章，请稍后刷新`);
-      setTimeout(() => setToast(""), 3200);
-      return;
-    }
-    setLegalLock({ operator: "法务人员A", occupiedAt: "2026-07-28 15:42:18" });
     setSelectedSeal("杭州宝茂网络科技有限公司合同专用章");
     setDetailOpen(false);
     setLegalSealOpen(true);
   }
 
-  function releaseLegalLock() {
+  function cancelLegalSeal() {
     setLegalSealOpen(false);
-    setLegalLock(null);
-    setToast("已确认腾讯侧尚未签章，本次占用已释放");
+    setToast("已取消签章，未提交任何用印结果");
     setTimeout(() => setToast(""), 3200);
   }
 
@@ -1223,7 +1214,6 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
       setStates(next);
       setLegalSealProcessing(false);
       setLegalSealOpen(false);
-      setLegalLock(null);
       setToast(`法务签章完成（${selectedSeal}），合同与证据报告已自动归档`);
       setTimeout(() => setToast(""), 4200);
     }, 1100);
@@ -1509,8 +1499,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 <div><span>签约主体</span><b>杭州宝茂网络科技有限公司</b></div>
                 <div><span>财务审核</span><b>{selectedState === "待合同审核" ? "待财务·林晓曼处理" : "已通过"}</b></div>
                 <div><span>作者签署（第 1 顺位）</span><b>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "合同审核通过后开始" : selectedState === "待作者签署" ? "待签署" : "已完成 · 主合同＋声明函"}</b></div>
-                <div><span>法务签章（第 2 顺位）</span><b>{selectedState === "签署完成" ? `已完成 · ${selectedSeal}` : selectedState === "待法务签章" ? "2 人有权限 · 任意一人先操作先占用" : "等待作者先签"}</b></div>
-                <div><span>当前签章占用</span><b>{legalLock ? `${legalLock.operator} · ${legalLock.occupiedAt}` : "未占用"}</b></div>
+                <div><span>法务签章（第 2 顺位）</span><b>{selectedState === "签署完成" ? `已完成 · ${selectedSeal}` : selectedState === "待法务签章" ? "待法务内部确认经办人" : "等待作者先签"}</b></div>
                 <div><span>版权文件占用</span><b>{selectedState === "签署完成" ? "已签合同＋证据报告：2 / 5" : "完成后预计新增 2 个文件"}</b></div>
               </div>
               <h3>流转留痕</h3><ol className="audit-list">
@@ -1518,7 +1507,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 <li><b>责编拟定并提交合同</b><span>{selectedNovel.owner} · 模板、稿费与签署顺序已保存</span></li>
                 <li><b>{selectedState === "待合同审核" ? "等待财务审核" : "财务审核通过"}</b><span>{selectedState === "待合同审核" ? "财务·林晓曼待处理" : "通过后已自动创建电子签流程并发送作者"}</span></li>
                 <li><b>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "作者签署尚未开始" : selectedState === "待作者签署" ? "等待作者签署" : "作者签署完成"}</b><span>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "合同审核通过后自动发送作者" : selectedState === "待作者签署" ? "电子合同已同步至作者投稿后台" : "主合同与声明函签名控件均完成"}</span></li>
-                <li><b>{selectedState === "签署完成" ? "法务签章完成并归档" : "等待法务手动签章"}</b><span>{selectedState === "签署完成" ? "腾讯回调成功后，合同 PDF 与证据报告已回写版权文件" : "两名有权法务均可处理；点击签章时原子占用，另一人不可重复进入"}</span></li>
+                <li><b>{selectedState === "签署完成" ? "法务签章完成并归档" : "等待法务手动签章"}</b><span>{selectedState === "签署完成" ? "腾讯回调成功后，合同 PDF 与证据报告已回写版权文件" : "法务内部自行确认本次经办人，由具备用印权限的法务完成签章"}</span></li>
               </ol>
             </>}
           </aside>
@@ -1621,12 +1610,12 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
           <footer><span>当前腾讯模板“发起人填写 0 处”，正式接入时由绿台服务端在创建文档阶段写入并锁定。</span><button className="primary" onClick={() => setMappingOpen(false)}>返回拟定合同</button></footer>
         </div>
       </div>}
-      {legalSealOpen && <div className="overlay esign-seal-overlay" onClick={releaseLegalLock}>
+      {legalSealOpen && <div className="overlay esign-seal-overlay" onClick={cancelLegalSeal}>
         <div className="esign-seal-modal" onClick={event => event.stopPropagation()}>
           <header className="esign-seal-header">
             <div className="esign-logo"><i>✓</i><span><b>腾讯电子签</b><small>企业签署页 · 绿台安全嵌入</small></span></div>
-            <div className="seal-lock-status"><i>●</i><span><b>签章处理中</b><small>{legalLock?.operator} · {legalLock?.occupiedAt}</small></span></div>
-            <button className="close" onClick={releaseLegalLock}>×</button>
+            <div className="seal-lock-status"><i>●</i><span><b>待确认签章</b><small>当前账号具备用印权限</small></span></div>
+            <button className="close" onClick={cancelLegalSeal}>×</button>
           </header>
           <div className="esign-stepbar"><span className="done">1 合同审核通过</span><i>→</i><span className="done">2 作者已签字</span><i>→</i><span className="active">3 法务选择印章</span><i>→</i><span>4 腾讯回调归档</span></div>
           <div className="esign-seal-body">
@@ -1635,11 +1624,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
               <figure><img src={`${import.meta.env.BASE_URL}contracts/guarantee-share/page-07.jpg`} alt="版权转让合同签署页"/><div className="author-signed-mark"><b>石京</b><span>作者已签 · 2026-07-28</span></div><div className="enterprise-seal-slot">请在此处加盖企业印章</div></figure>
             </section>
             <aside className="esign-control-pane">
-              <h3>法务签章</h3><p>每份合同均需有权限的法务手动选择印章并确认。本次签章由腾讯电子签完成并存证。</p>
-              <div className="legal-operators">
-                <div className="active"><i>法</i><span><b>法务人员A</b><small>当前操作人 · 已占用</small></span><em>操作中</em></div>
-                <div><i>法</i><span><b>法务人员B</b><small>拥有相同用印权限</small></span><em>不可重复进入</em></div>
-              </div>
+              <h3>法务签章</h3><p>法务内部自行确认本次签章经办人，绿台不展示或分配签章人员。具备用印权限的法务选择印章并确认后，由腾讯电子签完成签章与存证。</p>
               <div className="seal-picker-title"><b>指定印章</b><span>必选</span></div>
               <div className="seal-picker">
                 {(["杭州宝茂网络科技有限公司合同专用章", "杭州宝茂网络科技有限公司公章"] as SealName[]).map(seal => <button key={seal} className={selectedSeal === seal ? "selected" : ""} onClick={() => setSelectedSeal(seal)}>
@@ -1651,7 +1636,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
               <div className="seal-safety-note"><b>签章前校验</b><span>✓ 作者两处签名均已完成</span><span>✓ 合同版本未变化</span><span>✓ 当前账号拥有该印章权限</span></div>
             </aside>
           </div>
-          <footer className="esign-seal-footer"><span>关闭或取消后，系统将查询腾讯侧未签章状态并释放占用。</span><button className="secondary" onClick={releaseLegalLock}>取消并释放占用</button><button className="esign-confirm" disabled={legalSealProcessing} onClick={completeLegalSeal}>{legalSealProcessing ? "正在等待腾讯回调…" : "确认签章"}</button></footer>
+          <footer className="esign-seal-footer"><span>取消不会提交用印；确认后以腾讯电子签回调结果为准。</span><button className="secondary" onClick={cancelLegalSeal}>取消</button><button className="esign-confirm" disabled={legalSealProcessing} onClick={completeLegalSeal}>{legalSealProcessing ? "正在等待腾讯回调…" : "确认签章"}</button></footer>
         </div>
       </div>}
       {toast && <div className="toast">✓ {toast}</div>}

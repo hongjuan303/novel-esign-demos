@@ -87,3 +87,11 @@ test("matches the confirmed author work and income rules", async () => {
   assert.match(page, /签约日期/);
   assert.doesNotMatch(page, /到账状态/);
 });
+
+test("does not expose legal signer identities in the seal dialog", async () => {
+  const page = await readFile(new URL("app/page.tsx", projectRoot), "utf8");
+  assert.match(page, /法务内部自行确认本次签章经办人/);
+  assert.match(page, /当前账号具备用印权限/);
+  assert.doesNotMatch(page, /法务人员A|法务人员B/);
+  assert.doesNotMatch(page, /当前签章占用|取消并释放占用|先操作先占用/);
+});
