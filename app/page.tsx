@@ -5,6 +5,60 @@ import { useRef, useState } from "react";
 type EsignState = "待拟定合同" | "待合同审核" | "待作者签署" | "待法务签章" | "签署完成" | "已拒绝签约";
 type ImportStage = "upload" | "preview";
 type SealName = "杭州宝茂网络科技有限公司合同专用章" | "杭州宝茂网络科技有限公司公章";
+type AuthorExistingNovelKey = "contract" | "pending" | "draft" | "completed";
+type AuthorNovelEditValues = {
+  name: string;
+  intro: string;
+  finishDate: string;
+  tags: string[];
+  category: "男频" | "女频";
+  novelType: "长篇" | "短篇";
+  customCover: boolean;
+  coverClass: "purple" | "teal" | "sand" | "rose";
+};
+
+const authorNovelDefaults: Record<AuthorExistingNovelKey, AuthorNovelEditValues> = {
+  contract: {
+    name: "声声已离商音近",
+    intro: "七年前离开的人在雨夜归来，一通没有归属地的电话，让被掩埋的旧事重新浮出水面。",
+    finishDate: "2026-07-22",
+    tags: ["都市情感", "女性成长"],
+    category: "女频",
+    novelType: "短篇",
+    customCover: true,
+    coverClass: "purple",
+  },
+  pending: {
+    name: "消失的女儿",
+    intro: "女儿失踪后的第七天，一张旧照片将母亲带回被所有人刻意回避的真相。",
+    finishDate: "2026-07-21",
+    tags: ["悬疑推理", "女性成长"],
+    category: "女频",
+    novelType: "短篇",
+    customCover: true,
+    coverClass: "teal",
+  },
+  draft: {
+    name: "雾港来信",
+    intro: "一封迟到七年的信，让她重新回到那座被雨困住的海港小城。",
+    finishDate: "2026-07-20",
+    tags: ["都市情感", "现实生活"],
+    category: "男频",
+    novelType: "短篇",
+    customCover: true,
+    coverClass: "sand",
+  },
+  completed: {
+    name: "月光落在旧站台",
+    intro: "旧站台重新启用的那天，她终于等到那列迟到了十年的火车。",
+    finishDate: "2025-12-28",
+    tags: ["现实生活", "都市情感"],
+    category: "女频",
+    novelType: "短篇",
+    customCover: true,
+    coverClass: "rose",
+  },
+};
 
 const importedChapters = [
   { title: "第1章　雨夜来信", words: "1,426" },
@@ -311,6 +365,10 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
   const [paymentChapterId, setPaymentChapterId] = useState<number | null>(null);
   const [paymentMode, setPaymentMode] = useState<"free" | "paid">("free");
   const [paidChapterIds, setPaidChapterIds] = useState([21005, 21006, 21007, 21008]);
+  const [pendingProgressOpen, setPendingProgressOpen] = useState(false);
+  const [existingNovelEdits, setExistingNovelEdits] = useState(authorNovelDefaults);
+  const [selectedExistingNovel, setSelectedExistingNovel] = useState(authorNovelDefaults.contract);
+  const [editNovelForm, setEditNovelForm] = useState<(AuthorNovelEditValues & { key: "created" | AuthorExistingNovelKey }) | null>(null);
 
   const stateCopy = {
     待拟定合同: { label: "待签约", detail: "签约申请已提交，责编正在拟定电子合同", action: "查看进度" },
@@ -372,6 +430,74 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     notify("小说已创建，请继续导入正文");
   }
 
+  function openExistingNovelDetail(key: AuthorExistingNovelKey) {
+    const selectedNovel = existingNovelEdits[key];
+    setSelectedExistingNovel(selectedNovel);
+    setExistingGuide(selectedNovel.intro);
+    setView("content");
+  }
+
+  function openEditNovel(key: "created" | AuthorExistingNovelKey) {
+    if (key === "created") {
+      setEditNovelForm({
+        key,
+        name: novelName,
+        intro: novelIntro,
+        finishDate,
+        tags: novelTags,
+        category,
+        novelType,
+        customCover,
+        coverClass: "teal",
+      });
+      return;
+    }
+    setEditNovelForm({ key, ...existingNovelEdits[key] });
+  }
+
+  function toggleEditTag(tag: string) {
+    setEditNovelForm(current => current
+      ? {
+          ...current,
+          tags: current.tags.includes(tag)
+            ? current.tags.filter(item => item !== tag)
+            : [...current.tags, tag],
+        }
+      : current);
+  }
+
+  function saveEditedNovel() {
+    if (!editNovelForm || !editNovelForm.name.trim() || !editNovelForm.finishDate || editNovelForm.tags.length === 0) return;
+    if (editNovelForm.key === "created") {
+      setNovelName(editNovelForm.name.trim());
+      setNovelIntro(editNovelForm.intro.trim());
+      setFinishDate(editNovelForm.finishDate);
+      setNovelTags(editNovelForm.tags);
+      setCategory(editNovelForm.category);
+      setNovelType(editNovelForm.novelType);
+      setCustomCover(editNovelForm.customCover);
+    } else {
+      const key = editNovelForm.key;
+      const updatedNovel: AuthorNovelEditValues = {
+        name: editNovelForm.name.trim(),
+        intro: editNovelForm.intro.trim(),
+        finishDate: editNovelForm.finishDate,
+        tags: editNovelForm.tags,
+        category: editNovelForm.category,
+        novelType: editNovelForm.novelType,
+        customCover: editNovelForm.customCover,
+        coverClass: editNovelForm.coverClass,
+      };
+      setExistingNovelEdits(current => ({ ...current, [key]: updatedNovel }));
+      if (selectedExistingNovel.name === authorNovelDefaults[key].name || selectedExistingNovel.name === existingNovelEdits[key].name) {
+        setSelectedExistingNovel(updatedNovel);
+        setExistingGuide(updatedNovel.intro);
+      }
+    }
+    setEditNovelForm(null);
+    notify("小说信息已更新");
+  }
+
   function openImportNovel() {
     setImportStage("upload");
     setImportFileName("");
@@ -379,15 +505,21 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
   }
 
   function finishImport() {
-    const introWasEmpty = novelIntro.trim().length === 0;
-    if (introWasEmpty) setNovelIntro(importedGuide);
-    setDraftImported(true);
+    const editingCreatedNovel = view === "draftContent";
+    const introWasEmpty = editingCreatedNovel
+      ? novelIntro.trim().length === 0
+      : existingGuide.trim().length === 0;
+    if (introWasEmpty) {
+      if (editingCreatedNovel) setNovelIntro(importedGuide);
+      else setExistingGuide(importedGuide);
+    }
+    if (editingCreatedNovel) setDraftImported(true);
     setImportNovelModal(false);
     notify(introWasEmpty ? "导入成功，已自动使用文档导语补充简介" : "小说正文导入成功");
   }
 
   const isNewDraftDetail = view === "draftContent";
-  const detailNovelName = isNewDraftDetail ? (novelName || "未命名小说") : "声声已离商音近";
+  const detailNovelName = isNewDraftDetail ? (novelName || "未命名小说") : selectedExistingNovel.name;
   const detailNovelIntro = isNewDraftDetail
     ? (novelIntro || "暂未填写。导入小说后，系统将自动使用文档导语补充简介。")
     : existingGuide;
@@ -498,49 +630,59 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
             </section>
             <section className="author-work-list">
               {draftCreated && <article className="author-work-row new-draft-row">
-                <div className={`live-cover generated ${customCover ? "custom" : ""}`}><span>{novelName}</span></div>
+                <button className="work-cover-link" aria-label={`打开《${novelName}》小说详情`} onClick={() => setView("draftContent")}>
+                  <span className={`live-cover generated ${customCover ? "custom" : ""}`}><span>{novelName}</span></span>
+                </button>
                 <div className="live-work-main">
-                  <div className="live-work-title"><h2>{novelName}</h2><span className={`live-status ${draftApplied ? "waiting" : "draft"}`}>{draftApplied ? "待签约" : "草稿"}</span></div>
+                  <div className="live-work-title"><button className="work-title-link" onClick={() => setView("draftContent")}>{novelName}</button><span className={`live-status ${draftApplied ? "waiting" : "draft"}`}>{draftApplied ? "待签约" : "草稿"}</span></div>
                   <p>溪源 著</p>
                   <small>{draftImported ? "9,486字" : "0字"}　｜　{category} · {novelType} · {novelTags.join("、")}</small>
-                  <div className={`live-contract-line ${draftImported ? "plain" : ""}`}>{draftApplied ? "签约申请已提交，等待编辑处理" : draftImported ? "正文已导入，可继续校对章节和申请签约" : "基础信息已保存，请导入 .doc / .docx 小说正文"}</div>
+                  {draftApplied && <div className="live-contract-line plain">签约申请已提交，责编正在拟定合同</div>}
                 </div>
                 <div className="live-work-actions">
                   {draftApplied
-                    ? <button className="inline-mint" onClick={() => notify("签约申请已提交，等待编辑发起合同")}>查看进度</button>
+                    ? <button className="inline-mint" onClick={() => setPendingProgressOpen(true)}>查看进度</button>
                     : <button className="inline-mint" onClick={() => {if (!draftImported) {notify("请先导入小说正文，再申请签约"); return;} setApplyTarget("created"); setApplyModal(true);}}>♢ 申请签约</button>}
-                  <button className="pill-action soft" onClick={() => setView("draftContent")}>小说详情</button>
+                  <button className="pill-action soft" onClick={() => openEditNovel("created")}>编辑</button>
                 </div>
               </article>}
               <article className="author-work-row contract-row">
-                <div className="live-cover purple">声声已离<br/>商音近</div>
+                <button className="work-cover-link" aria-label={`打开《${existingNovelEdits.contract.name}》小说详情`} onClick={() => openExistingNovelDetail("contract")}>
+                  <span className={`live-cover ${existingNovelEdits.contract.customCover ? existingNovelEdits.contract.coverClass : "generated"}`}>{existingNovelEdits.contract.name}</span>
+                </button>
                 <div className="live-work-main">
-                  <div className="live-work-title"><h2>声声已离商音近</h2><span className={`live-status ${state === "签署完成" ? "done" : "waiting"}`}>{stateCopy.label}</span></div>
+                  <div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("contract")}>{existingNovelEdits.contract.name}</button><span className={`live-status ${state === "签署完成" ? "done" : stateCopy.label === "草稿" ? "draft" : "waiting"}`}>{stateCopy.label}</span></div>
                   <p>溪源 著</p><small>9,427字　｜　女频 · 都市情感</small>
-                  <div className="live-contract-line"><b>{stateCopy.detail}</b>{state === "待作者签署" && <span>请及时完成合同核对</span>}</div>
+                  {stateCopy.label !== "草稿" && stateCopy.label !== "签约完成" && <div className="live-contract-line"><b>{stateCopy.detail}</b>{state === "待作者签署" && <span>请及时完成合同核对</span>}</div>}
                 </div>
                 <div className="live-work-actions">
-                  {state !== "签署完成" && <button className="inline-mint" onClick={() => state === "待拟定合同" || state === "待合同审核" ? notify(stateCopy.detail) : setSignModal(true)}>查看进度</button>}
-                  <button className="pill-action soft" onClick={() => setView("content")}>小说详情</button>
+                  {state !== "签署完成" && <button className="inline-mint" onClick={() => state === "待拟定合同" || state === "待合同审核" ? setPendingProgressOpen(true) : setSignModal(true)}>查看进度</button>}
+                  <button className="pill-action soft" onClick={() => openEditNovel("contract")}>编辑</button>
                 </div>
               </article>
 
               <article className="author-work-row">
-                <div className="live-cover teal">消失的<br/>女儿</div>
-                <div className="live-work-main"><div className="live-work-title"><h2>消失的女儿</h2><span className="live-status waiting">待签约</span></div><p>溪源 著</p><small>10,029字　｜　女频 · 悬疑</small><div className="live-contract-line plain">签约申请已提交，责编正在拟定合同</div></div>
-                <div className="live-work-actions"><button className="inline-mint" onClick={() => notify("合同尚未发起，请等待编辑处理")}>查看进度</button><button className="pill-action soft" onClick={() => setView("content")}>小说详情</button></div>
+                <button className="work-cover-link" aria-label={`打开《${existingNovelEdits.pending.name}》小说详情`} onClick={() => openExistingNovelDetail("pending")}>
+                  <span className={`live-cover ${existingNovelEdits.pending.customCover ? existingNovelEdits.pending.coverClass : "generated"}`}>{existingNovelEdits.pending.name}</span>
+                </button>
+                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("pending")}>{existingNovelEdits.pending.name}</button><span className="live-status waiting">待签约</span></div><p>溪源 著</p><small>10,029字　｜　女频 · 悬疑</small><div className="live-contract-line plain">签约申请已提交，责编正在拟定合同</div></div>
+                <div className="live-work-actions"><button className="inline-mint" onClick={() => setPendingProgressOpen(true)}>查看进度</button><button className="pill-action soft" onClick={() => openEditNovel("pending")}>编辑</button></div>
               </article>
 
               <article className="author-work-row">
-                <div className="live-cover sand">雾港<br/>来信</div>
-                <div className="live-work-main"><div className="live-work-title"><h2>雾港来信</h2><span className={`live-status ${existingDraftApplied ? "waiting" : "draft"}`}>{existingDraftApplied ? "待签约" : "草稿"}</span></div><p>溪源 著</p><small>8,832字　｜　男频 · 都市</small><div className="live-contract-line plain">{existingDraftApplied ? "签约申请已提交，等待编辑处理" : "正文已达到 8,000～20,000 字申请要求，签约资料已完善"}</div></div>
-                <div className="live-work-actions">{existingDraftApplied ? <button className="inline-mint" onClick={() => notify("签约申请已提交，等待编辑发起合同")}>查看进度</button> : <button className="inline-mint" onClick={() => {setApplyTarget("existing");setApplyModal(true);}}>♢ 申请签约</button>}<button className="pill-action soft" onClick={() => setView("content")}>小说详情</button></div>
+                <button className="work-cover-link" aria-label={`打开《${existingNovelEdits.draft.name}》小说详情`} onClick={() => openExistingNovelDetail("draft")}>
+                  <span className={`live-cover ${existingNovelEdits.draft.customCover ? existingNovelEdits.draft.coverClass : "generated"}`}>{existingNovelEdits.draft.name}</span>
+                </button>
+                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("draft")}>{existingNovelEdits.draft.name}</button><span className={`live-status ${existingDraftApplied ? "waiting" : "draft"}`}>{existingDraftApplied ? "待签约" : "草稿"}</span></div><p>溪源 著</p><small>8,832字　｜　男频 · 都市</small>{existingDraftApplied && <div className="live-contract-line plain">签约申请已提交，责编正在拟定合同</div>}</div>
+                <div className="live-work-actions">{existingDraftApplied ? <button className="inline-mint" onClick={() => setPendingProgressOpen(true)}>查看进度</button> : <button className="inline-mint" onClick={() => {setApplyTarget("existing");setApplyModal(true);}}>♢ 申请签约</button>}<button className="pill-action soft" onClick={() => openEditNovel("draft")}>编辑</button></div>
               </article>
 
               <article className="author-work-row">
-                <div className="live-cover rose">月光落在<br/>旧站台</div>
-                <div className="live-work-main"><div className="live-work-title"><h2>月光落在旧站台</h2><span className="live-status done">签约完成</span></div><p>溪源 著</p><small>12,604字　｜　女频 · 现实情感</small><div className="live-contract-line plain">历史线下合同已由业务上传</div></div>
-                <div className="live-work-actions"><button className="pill-action soft" onClick={() => setView("content")}>小说详情</button></div>
+                <button className="work-cover-link" aria-label={`打开《${existingNovelEdits.completed.name}》小说详情`} onClick={() => openExistingNovelDetail("completed")}>
+                  <span className={`live-cover ${existingNovelEdits.completed.customCover ? existingNovelEdits.completed.coverClass : "generated"}`}>{existingNovelEdits.completed.name}</span>
+                </button>
+                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("completed")}>{existingNovelEdits.completed.name}</button><span className="live-status done">签约完成</span></div><p>溪源 著</p><small>12,604字　｜　女频 · 现实情感</small></div>
+                <div className="live-work-actions"><button className="pill-action soft" onClick={() => openEditNovel("completed")}>编辑</button></div>
               </article>
             </section>
             <div className="author-pagination">共 4 条　‹　<b>1</b>　›　 <span>10 条/页⌄</span></div>
@@ -589,7 +731,7 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
               <button className="mint-button" onClick={() => openChapterEditor("add")}>新增章节</button>
             </div>
             <div className="greenlike-novel-summary">
-              <div className={`greenlike-cover generated ${customCover && isNewDraftDetail ? "custom" : ""}`}>
+              <div className={`greenlike-cover ${isNewDraftDetail ? `generated ${customCover ? "custom" : ""}` : selectedExistingNovel.customCover ? selectedExistingNovel.coverClass : "generated"}`}>
                 <span>{detailNovelName}</span>
               </div>
               <div className="greenlike-summary-copy">
@@ -655,9 +797,35 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
         </div>
       </div>}
 
+      {editNovelForm && <div className="overlay" onClick={() => setEditNovelForm(null)}>
+        <div className="author-novel-modal" role="dialog" aria-label="编辑小说信息" onClick={event => event.stopPropagation()}>
+          <div className="novel-modal-header"><div><h2>编辑小说信息</h2><p>修改小说基础信息；正文、导语和章节内容请进入小说详情页操作</p></div><button className="close" onClick={() => setEditNovelForm(null)}>×</button></div>
+          <div className="novel-modal-body">
+            <aside className="cover-builder">
+              <div className={`generated-cover-preview ${editNovelForm.customCover ? "custom" : ""}`}><span>{editNovelForm.name || "小说名称"}</span><small>{editNovelForm.customCover ? "自定义封面预览" : "默认封面预览"}</small></div>
+              <button className="cover-upload-button" onClick={() => setEditNovelForm(current => current ? { ...current, customCover: !current.customCover } : current)}>{editNovelForm.customCover ? "恢复默认封面" : "上传封面"}</button>
+              <p>不上传时使用默认底图，并自动叠加小说名称。</p>
+            </aside>
+            <div className="author-create-form">
+              <section><h3>小说信息</h3>
+                <label className="form-field"><span><b>*</b> 小说名称</span><div><input value={editNovelForm.name} onChange={event => setEditNovelForm(current => current ? { ...current, name: event.target.value } : current)} placeholder="请输入小说名称" maxLength={50}/><small>{editNovelForm.name.length}/50</small></div></label>
+                <label className="form-field"><span>简介</span><div><textarea value={editNovelForm.intro} onChange={event => setEditNovelForm(current => current ? { ...current, intro: event.target.value } : current)} placeholder="请输入简介（选填）" maxLength={500}/><small>{editNovelForm.intro.length}/500</small><em>若未填写，重新导入小说时可使用文档导语补充</em></div></label>
+                <label className="form-field"><span><b>*</b> 完结日期</span><div><input type="date" value={editNovelForm.finishDate} onChange={event => setEditNovelForm(current => current ? { ...current, finishDate: event.target.value } : current)}/><em>精确到天</em></div></label>
+              </section>
+              <section><h3>内容信息</h3>
+                <div className="form-field"><span><b>*</b> 标签</span><div className="tag-picker">{["都市情感","悬疑推理","现实生活","追妻火葬场","女性成长","爽文"].map(tag => <button type="button" key={tag} className={editNovelForm.tags.includes(tag) ? "selected" : ""} onClick={() => toggleEditTag(tag)}>{editNovelForm.tags.includes(tag) ? "✓ " : ""}{tag}</button>)}<em>至少选择 1 个标签</em></div></div>
+                <div className="form-field"><span><b>*</b> 分类</span><div className="choice-cards"><button type="button" className={editNovelForm.category === "男频" ? "selected" : ""} onClick={() => setEditNovelForm(current => current ? { ...current, category: "男频" } : current)}>男频</button><button type="button" className={editNovelForm.category === "女频" ? "selected" : ""} onClick={() => setEditNovelForm(current => current ? { ...current, category: "女频" } : current)}>女频</button></div></div>
+                <div className="form-field"><span><b>*</b> 小说类型</span><div className="choice-cards"><button type="button" className={editNovelForm.novelType === "长篇" ? "selected" : ""} onClick={() => setEditNovelForm(current => current ? { ...current, novelType: "长篇" } : current)}>长篇</button><button type="button" className={editNovelForm.novelType === "短篇" ? "selected" : ""} onClick={() => setEditNovelForm(current => current ? { ...current, novelType: "短篇" } : current)}>短篇</button></div></div>
+              </section>
+            </div>
+          </div>
+          <div className="novel-modal-footer"><span>{editNovelForm.name.trim() && editNovelForm.finishDate && editNovelForm.tags.length > 0 ? "信息已完整，可以保存" : "请填写小说名称、完结日期并至少选择 1 个标签"}</span><button className="soft-button" onClick={() => setEditNovelForm(null)}>取消</button><button className="mint-button" disabled={!editNovelForm.name.trim() || !editNovelForm.finishDate || editNovelForm.tags.length === 0} onClick={saveEditedNovel}>保存修改</button></div>
+        </div>
+      </div>}
+
       {importNovelModal && <div className="overlay" onClick={() => setImportNovelModal(false)}>
         <div className="author-import-modal" onClick={event => event.stopPropagation()}>
-          <div className="novel-modal-header"><div><h2>导入小说</h2><p>{novelName || "当前小说"} · 支持 .doc、.docx</p></div><button className="close" onClick={() => setImportNovelModal(false)}>×</button></div>
+          <div className="novel-modal-header"><div><h2>导入小说</h2><p>{detailNovelName} · 支持 .doc、.docx</p></div><button className="close" onClick={() => setImportNovelModal(false)}>×</button></div>
           {importStage === "upload" ? <div className="import-modal-content">
             <button className={`import-dropzone ${importFileName ? "has-file" : ""}`} onClick={() => setImportFileName("雨停之后的第七封信.docx")}>
               <i>{importFileName ? "DOCX" : "⇧"}</i>
@@ -763,14 +931,35 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
 
       {applyModal && <div className="overlay" onClick={() => setApplyModal(false)}><div className="author-confirm-modal" onClick={event => event.stopPropagation()}><button className="close" onClick={() => setApplyModal(false)}>×</button><i>♢</i><h2>确认申请签约</h2><p>提交后责编将根据以下资料拟定合同；合同发起后正文将锁定。</p><ul><li>✓ 正文字数 8,832，符合 8,000～20,000 字要求</li><li>✓ 作者实名认证与签约资料已完整</li><li>✓ 小说名称、分类、标签、小说类型和完结日期已填写</li></ul><div className="modal-actions"><button className="soft-button" onClick={() => setApplyModal(false)}>取消</button><button className="mint-button" onClick={() => {setApplyModal(false); if (applyTarget === "created") setDraftApplied(true); else setExistingDraftApplied(true); notify("申请签约已提交，责编将开始拟定合同");}}>确认申请</button></div></div></div>}
 
+      {pendingProgressOpen && <div className="overlay" onClick={() => setPendingProgressOpen(false)}>
+        <div className="pending-sign-progress-modal" role="dialog" aria-label="待签约进度" onClick={event => event.stopPropagation()}>
+          <button className="close" onClick={() => setPendingProgressOpen(false)}>×</button>
+          <i>⌛</i>
+          <h2>签约进度</h2>
+          <p>责编正在拟定合同中，请稍后查看进度</p>
+          <button className="mint-button wide" onClick={() => setPendingProgressOpen(false)}>知道了</button>
+        </div>
+      </div>}
+
       {signModal && <div className="overlay" onClick={() => setSignModal(false)}><div className="author-contract-modal live-style" onClick={event => event.stopPropagation()}>
-        <button className="close" onClick={() => setSignModal(false)}>×</button><div className="tencent-mark">✓ 腾讯电子签</div><h2>{state === "待作者签署" ? "签署前确认" : "电子合同详情"}</h2><p>《声声已离商音近》版权转让合同（保底＋分成）</p>
-        <div className="contract-summary"><div><span>签约方式</span><b>保底＋分成</b></div><div><span>税前保底费用</span><b className="money">¥12,000.00</b></div><div><span>甲方</span><b>杭州宝茂网络科技有限公司</b></div><div><span>乙方</span><b>石＊京（笔名：溪源）</b></div><div><span>签署顺序</span><b>作者先签 → 法务签章</b></div></div>
-        <div className="author-prefill-result"><i>✓</i><div><b>合同信息已自动带入</b><span>实名、小说、金额、收款账户等内容已由绿台预填并锁定，作者无需重复填写，只需核对合同并完成两处签名。</span></div></div>
-        <div className="signature-scope"><b>本次需完成 2 处签名</b><span>① 主合同签署页　② 附件《版权转让声明函》</span></div><div className="safe-note">签署将在腾讯电子签安全页面完成，返回后以服务端回调更新最终状态。</div>
-        {state === "待作者签署" && <><label className="agreement"><input type="checkbox" defaultChecked/> 我已核对合同主体、保底费用和分成规则</label><button className="mint-button wide" disabled={signing} onClick={completeAuthorSign}>{signing ? "正在同步签署结果…" : "前往腾讯电子签"}</button></>}
-        {state === "待法务签章" && <div className="waiting-platform"><i>✓</i><b>作者签署已完成</b><span>法务将在绿台内嵌腾讯电子签页面手动选择印章并确认</span></div>}
-        {state === "签署完成" && <div className="signed-file-actions"><button className="mint-button" onClick={() => notify("已下载签署完成的合同 PDF")}>下载已签合同</button><button className="soft-button" onClick={() => notify("已下载腾讯电子签证据报告")}>下载证据报告</button></div>}
+        <button className="close" onClick={() => setSignModal(false)}>×</button><div className="tencent-mark">✓ 腾讯电子签</div><h2>{state === "签署完成" ? "电子合同详情" : "签约进度"}</h2><p>《{existingNovelEdits.contract.name}》版权转让合同（保底＋分成）</p>
+        {(state === "待作者签署" || state === "待法务签章") && <>
+          <div className="sign-progress-summary">
+            <div><span>签约税前金额</span><b className="money">¥12,000.00</b></div>
+            <div><span>甲方</span><b>杭州宝茂网络科技有限公司</b></div>
+            <div><span>乙方</span><b>石＊京（笔名：溪源）</b></div>
+          </div>
+          <div className="signature-scope"><b>本次需完成 2 处签名</b><span>① 主合同签署页　② 附件《版权转让声明函》</span></div>
+          <button className="mint-button wide" disabled={signing} onClick={state === "待作者签署" ? completeAuthorSign : () => notify("已打开腾讯电子签合同进度")}>{signing ? "正在同步签署结果…" : "前往腾讯电子签"}</button>
+        </>}
+        {state === "签署完成" && <>
+          <div className="sign-progress-summary">
+            <div><span>签约税前金额</span><b className="money">¥12,000.00</b></div>
+            <div><span>甲方</span><b>杭州宝茂网络科技有限公司</b></div>
+            <div><span>乙方</span><b>石＊京（笔名：溪源）</b></div>
+          </div>
+          <div className="signed-file-actions"><button className="mint-button" onClick={() => notify("已下载签署完成的合同 PDF")}>下载已签合同</button><button className="soft-button" onClick={() => notify("已下载腾讯电子签证据报告")}>下载证据报告</button></div>
+        </>}
       </div></div>}
       {toast && <div className="toast">✓ {toast}</div>}
     </div>
