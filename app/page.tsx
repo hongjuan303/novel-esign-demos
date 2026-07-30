@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 type EsignState = "待拟定合同" | "待合同审核" | "待作者签署" | "待法务签章" | "签署完成" | "已拒绝签约";
 type ImportStage = "upload" | "preview";
 type SealName = "杭州宝茂网络科技有限公司合同专用章" | "杭州宝茂网络科技有限公司公章";
+type FinanceReviewer = "财务审核人A" | "财务审核人B";
 type AuthorExistingNovelKey = "contract" | "pending" | "draft" | "completed";
 type AuthorNovelEditValues = {
   name: string;
@@ -145,7 +146,21 @@ const novels = [
     legacy: true,
     createdAt: "2026-07-22 18:54:56",
   },
+  {
+    id: "1043",
+    name: "长夜告白",
+    author: "鹿鸣",
+    editor: "长青",
+    owner: "吴鑫鑫",
+    department: "钱行工作室",
+    price: "10,500",
+    contractType: "买断",
+    legacy: false,
+    createdAt: "2026-07-21 15:26:38",
+  },
 ];
+
+const financeReviewers: FinanceReviewer[] = ["财务审核人A", "财务审核人B"];
 
 const templateControlGroups = [
   { group: "甲方联系人与商业金额", count: 4, source: "企业配置＋责编拟定", handling: "审核通过后由绿台 API 预填并锁定", status: "已映射" },
@@ -988,6 +1003,15 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
   const [detailOpen, setDetailOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
+  const [currentFinanceReviewer, setCurrentFinanceReviewer] = useState<FinanceReviewer>("财务审核人A");
+  const [financeApprovals, setFinanceApprovals] = useState<Record<string, FinanceReviewer[]>>({
+    "1048": ["财务审核人A", "财务审核人B"],
+    "1047": ["财务审核人A"],
+    "1045": ["财务审核人A", "财务审核人B"],
+    "1043": [],
+  });
+  const [batchReviewIds, setBatchReviewIds] = useState<string[]>([]);
+  const [batchReviewOpen, setBatchReviewOpen] = useState(false);
   const [rejectModal, setRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectSigningOpen, setRejectSigningOpen] = useState(false);
@@ -1010,6 +1034,8 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
   const [toast, setToast] = useState("");
   const selectedState = states[selected];
   const selectedNovel = novels[selected];
+  const selectedFinanceApprovals = financeApprovals[selectedNovel.id] || [];
+  const currentFinanceApproved = selectedFinanceApprovals.includes(currentFinanceReviewer);
   const previewPageCount = draftContractType === "买断" ? 5 : 10;
   const previewTemplateName = draftContractType === "买断"
     ? "短篇小说版权合同（买断）"
@@ -1076,19 +1102,30 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     const next = [...states];
     next[selected] = "待合同审核";
     setStates(next);
+    setFinanceApprovals(current => ({ ...current, [selectedNovel.id]: [] }));
     setLaunchModal(false);
-    setToast("合同已提交财务审核；审核通过后将自动发送给作者");
+    setToast("合同已提交双人财务审核；两人全部通过后将自动发送给作者");
     setTimeout(() => setToast(""), 3200);
   }
 
   function approveContract() {
+    if (currentFinanceApproved) {
+      setApproveConfirmOpen(false);
+      setToast(`${currentFinanceReviewer}已审核通过，无需重复操作`);
+      setTimeout(() => setToast(""), 3200);
+      return;
+    }
+    const nextApprovals = [...selectedFinanceApprovals, currentFinanceReviewer];
+    setFinanceApprovals(current => ({ ...current, [selectedNovel.id]: nextApprovals }));
     const next = [...states];
-    next[selected] = "待作者签署";
+    if (nextApprovals.length === financeReviewers.length) next[selected] = "待作者签署";
     setStates(next);
     setDetailOpen(false);
     setReviewOpen(false);
     setApproveConfirmOpen(false);
-    setToast("财务审核通过，合同已自动同步至作者投稿后台");
+    setToast(nextApprovals.length === financeReviewers.length
+      ? "两名财务均已审核通过，合同已自动同步至作者投稿后台"
+      : `${currentFinanceReviewer}审核通过，合同继续等待另一名财务审核`);
     setTimeout(() => setToast(""), 3200);
   }
 
@@ -1097,12 +1134,62 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     const next = [...states];
     next[selected] = "待拟定合同";
     setStates(next);
+    setFinanceApprovals(current => ({ ...current, [selectedNovel.id]: [] }));
     setRejectModal(false);
     setDetailOpen(false);
     setReviewOpen(false);
     setRejectReason("");
     setToast("合同已驳回责编修改，驳回意见已记录");
     setTimeout(() => setToast(""), 3200);
+  }
+
+  function toggleBatchReview(novelId: string) {
+    setBatchReviewIds(current => current.includes(novelId)
+      ? current.filter(id => id !== novelId)
+      : [...current, novelId]);
+  }
+
+  function toggleAllPendingReviews() {
+    const pendingIds = novels
+      .map((novel, index) => ({ novel, index }))
+      .filter(({ novel, index }) => !novel.legacy && states[index] === "待合同审核")
+      .map(({ novel }) => novel.id);
+    setBatchReviewIds(current => current.length === pendingIds.length ? [] : pendingIds);
+  }
+
+  function confirmBatchReview() {
+    const nextStates = [...states];
+    const nextApprovals = { ...financeApprovals };
+    let reviewedCount = 0;
+    let completedCount = 0;
+    let skippedCount = 0;
+
+    batchReviewIds.forEach(novelId => {
+      const index = novels.findIndex(novel => novel.id === novelId);
+      if (index < 0 || nextStates[index] !== "待合同审核") {
+        skippedCount += 1;
+        return;
+      }
+      const approvals = nextApprovals[novelId] || [];
+      if (approvals.includes(currentFinanceReviewer)) {
+        skippedCount += 1;
+        return;
+      }
+      const updated = [...approvals, currentFinanceReviewer];
+      nextApprovals[novelId] = updated;
+      reviewedCount += 1;
+      if (updated.length === financeReviewers.length) {
+        nextStates[index] = "待作者签署";
+        completedCount += 1;
+      }
+    });
+
+    setFinanceApprovals(nextApprovals);
+    setStates(nextStates);
+    setBatchReviewIds([]);
+    setBatchReviewOpen(false);
+    setToast(`批量审核完成：本人通过 ${reviewedCount} 份，双人完成并同步作者 ${completedCount} 份${skippedCount ? `，跳过 ${skippedCount} 份` : ""}`);
+    setTimeout(() => setToast(""), 4200);
   }
 
   function showContract(index: number) {
@@ -1243,16 +1330,29 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
               <label>合同类型<select><option>全部</option><option>买断</option><option>保底＋分成</option></select></label>
               <label>签约状态<select><option>全部</option><option>待拟定合同</option><option>待合同审核</option><option>待作者签署</option><option>待法务签章</option><option>签署完成</option><option>已拒绝签约</option><option>异常</option></select></label>
               <label>责编<select><option>请选择</option><option>吴鑫鑫</option><option>柴文静</option></select></label>
-              <label>财务审核人<select><option>请选择</option><option>财务·林晓曼</option></select></label>
+              <label>财务审核人<select><option>请选择</option><option>财务审核人A</option><option>财务审核人B</option></select></label>
               <label>申请日期<input placeholder="开始日期　至　结束日期"/></label>
               <div className="filter-actions"><button className="primary small">查询</button><button className="secondary small">重置</button><button className="secondary small">导出</button></div>
             </section>
-            <div className="table-toolbar contract-list-toolbar"><span>数据源：作者在投稿后台提交签约申请的全部小说；合同由责编拟定、财务审核、作者签字、法务签章。</span></div>
+            <div className="table-toolbar contract-list-toolbar finance-batch-toolbar">
+              <div>
+                <button className="primary small" disabled={batchReviewIds.length === 0} onClick={() => setBatchReviewOpen(true)}>批量审核</button>
+                <span>已选 {batchReviewIds.length} 份</span>
+              </div>
+              <label>当前财务账号
+                <select value={currentFinanceReviewer} onChange={event => setCurrentFinanceReviewer(event.target.value as FinanceReviewer)}>
+                  {financeReviewers.map(reviewer => <option key={reviewer}>{reviewer}</option>)}
+                </select>
+              </label>
+              <span>两名财务并行审核、无先后顺序；两名财务全部通过后才同步给作者签约。</span>
+            </div>
             <section className="live-table-wrap">
-                <table className="live-table contract-list-table"><thead><tr><th>签约单号</th><th>小说名称</th><th>作者</th><th>合同类型</th><th>签约金额</th><th>签约主体</th><th>责编</th><th>财务审核人</th><th>签约状态</th><th>更新时间</th><th>操作</th></tr></thead>
+                <table className="live-table contract-list-table"><thead><tr><th className="batch-check-cell"><input type="checkbox" aria-label="全选待审核合同" checked={batchReviewIds.length > 0 && batchReviewIds.length === novels.filter((novel, index) => !novel.legacy && states[index] === "待合同审核").length} onChange={toggleAllPendingReviews}/></th><th>签约单号</th><th>小说名称</th><th>作者</th><th>合同类型</th><th>签约金额</th><th>签约主体</th><th>责编</th><th>财务审核进度</th><th>签约状态</th><th>更新时间</th><th>操作</th></tr></thead>
                   <tbody>{novels.map((novel, index) => ({ novel, index })).filter(({novel}) => !novel.legacy).map(({novel, index}) => {
                     const rowState = states[index];
+                    const rowApprovals = financeApprovals[novel.id] || [];
                     return <tr key={novel.id}>
+                      <td className="batch-check-cell"><input type="checkbox" aria-label={`选择${novel.name}`} disabled={rowState !== "待合同审核"} checked={batchReviewIds.includes(novel.id)} onChange={() => toggleBatchReview(novel.id)}/></td>
                       <td>{rowState === "签署完成" ? `QS20260723${index + 18}` : `SQ20260723${index + 31}`}</td>
                       <td><button className="novel-link" onClick={() => openNovelPreview(index)}>{novel.name}</button></td>
                       <td>{novel.author}</td>
@@ -1260,7 +1360,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                       <td>¥{novel.price}</td>
                       <td>杭州宝茂网络科技有限公司</td>
                       <td>{novel.owner}</td>
-                      <td>{rowState === "待拟定合同" || rowState === "已拒绝签约" ? "-" : "财务·林晓曼"}</td>
+                      <td>{rowState === "待拟定合同" || rowState === "已拒绝签约" ? "-" : <span className={`finance-progress ${rowApprovals.length === 2 ? "complete" : ""}`}><b>{rowApprovals.length}/2</b><small>{rowApprovals.length === 2 ? "均已通过" : rowApprovals.length === 1 ? `${rowApprovals[0]}已通过` : "等待两人审核"}</small></span>}</td>
                       <td><Badge tone={rowState === "签署完成" ? "green" : rowState === "已拒绝签约" ? "gray" : rowState === "待拟定合同" ? "blue" : "orange"}>{rowState}</Badge></td>
                       <td>07-27 14:{20 + index}</td>
                       <td><div className="row-actions">
@@ -1348,12 +1448,12 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 <label><span><b>*</b> 联系地址</span><input value={draftAuthor.address} onChange={event => updateDraftAuthor("address", event.target.value)}/></label>
                 <label><span><b>*</b> 开户行</span><input value={draftAuthor.bankName} onChange={event => updateDraftAuthor("bankName", event.target.value)}/></label>
                 <label><span><b>*</b> 银行卡号</span><input value={draftAuthor.bankAccount} onChange={event => updateDraftAuthor("bankAccount", event.target.value)}/></label>
-                <label><span><b>*</b> 财务审核人</span><select><option>财务·林晓曼</option></select></label>
-                <div className="fill-sign-order"><b>签署顺序</b><span>财务审核 → 作者签字 → 法务签章</span></div>
+                <label><span><b>*</b> 财务审核人</span><select><option>财务审核人A＋财务审核人B（并行）</option></select></label>
+                <div className="fill-sign-order"><b>签署顺序</b><span>财务双人并行审核（全部通过）→ 作者签字 → 法务签章</span></div>
                 <label className="control-confirm-check"><input type="checkbox" checked={draftConfirmed} onChange={event => setDraftConfirmed(event.target.checked)}/><span>我已对照左侧合同原文，核对上述填写控件准确无误</span></label>
               </aside>
             </div>
-            <footer className="contract-drafting-footer"><span>合同审核通过后才创建正式腾讯电子签流程；当前预览不消耗合同份数。</span><button className="secondary" onClick={() => setLaunchModal(false)}>暂存草稿</button><button className="primary" disabled={!draftConfirmed} onClick={launchFlow}>提交财务审核</button></footer>
+            <footer className="contract-drafting-footer"><span>两名财务全部审核通过后才创建正式腾讯电子签流程；当前预览不消耗合同份数。</span><button className="secondary" onClick={() => setLaunchModal(false)}>暂存草稿</button><button className="primary" disabled={!draftConfirmed} onClick={launchFlow}>提交双人财务审核</button></footer>
           </div>
         </div>
       )}
@@ -1421,6 +1521,23 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
           <footer><span>{newNovelMode === "manual" ? "默认手动录入" : `已选择 ${selectedSigningNovelIds.length} 本小说`}</span><button className="secondary" onClick={() => setNewNovelModalOpen(false)}>取消</button>{newNovelMode === "manual" ? <button className="primary" disabled={!manualNovelName.trim() || !manualNovelAuthor.trim()} onClick={confirmManualNovel}>确定新建</button> : <button className="primary" disabled={selectedSigningNovelIds.length === 0} onClick={confirmSigningNovelSelection}>确认选择</button>}</footer>
         </div>
       </div>}
+      {batchReviewOpen && <div className="overlay batch-review-overlay" onClick={() => setBatchReviewOpen(false)}>
+        <div className="batch-review-modal" onClick={event => event.stopPropagation()}>
+          <header><div><h2>批量审核合同</h2><p>当前审核账号：{currentFinanceReviewer}</p></div><button className="close" onClick={() => setBatchReviewOpen(false)}>×</button></header>
+          <div className="batch-review-rule"><b>双人并行审核规则</b><span>本次批量操作只记录当前财务的审核结果，不代替另一名财务；同一账号已审核的合同将自动跳过。两名财务全部通过后，合同才同步给作者签约。</span></div>
+          <div className="batch-review-list">
+            <div className="batch-review-list-head"><span>小说 / 作者</span><span>当前进度</span><span>本次结果</span></div>
+            {batchReviewIds.map(novelId => {
+              const novel = novels.find(item => item.id === novelId)!;
+              const approvals = financeApprovals[novelId] || [];
+              const alreadyReviewed = approvals.includes(currentFinanceReviewer);
+              const nextCount = alreadyReviewed ? approvals.length : Math.min(2, approvals.length + 1);
+              return <div key={novelId}><span><b>《{novel.name}》</b><small>{novel.author} · {novel.contractType}</small></span><span><b>{approvals.length}/2</b><small>{approvals.length ? `${approvals.join("、")}已通过` : "尚无人通过"}</small></span><span className={alreadyReviewed ? "skip" : nextCount === 2 ? "complete" : "pending"}>{alreadyReviewed ? "跳过·本人已审核" : nextCount === 2 ? "通过后同步作者" : "通过后等待另一人"}</span></div>;
+            })}
+          </div>
+          <footer><span>已选择 {batchReviewIds.length} 份合同</span><button className="secondary" onClick={() => setBatchReviewOpen(false)}>取消</button><button className="primary" onClick={confirmBatchReview}>确认批量通过</button></footer>
+        </div>
+      </div>}
       {reviewOpen && <div className="overlay contract-review-overlay" onClick={() => setReviewOpen(false)}>
         <div className="contract-review-modal" onClick={event => event.stopPropagation()}>
           <header className="contract-review-header">
@@ -1454,15 +1571,21 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 <div><dt>签约金额</dt><dd>¥{selectedNovel.price}</dd></div>
                 <div><dt>作者</dt><dd>石＊京 / {selectedNovel.author}</dd></div>
                 <div><dt>责编</dt><dd>{selectedNovel.owner}</dd></div>
-                <div><dt>财务审核人</dt><dd>财务·林晓曼</dd></div>
               </dl>
-              <div className="review-readonly-tip"><b>审核说明</b><span>本页面只读展示腾讯电子签返回的已填充合同。若内容有误，请审核驳回并由责编重新拟定。</span></div>
+              <div className="finance-dual-review">
+                <div className="finance-dual-title"><b>双人审核进度</b><span>{selectedFinanceApprovals.length}/2</span></div>
+                {financeReviewers.map(reviewer => <div key={reviewer} className={selectedFinanceApprovals.includes(reviewer) ? "approved" : ""}>
+                  <i>{selectedFinanceApprovals.includes(reviewer) ? "✓" : "待"}</i><span><b>{reviewer}</b><small>{selectedFinanceApprovals.includes(reviewer) ? "已审核通过" : "待审核 · 无先后顺序"}</small></span>{currentFinanceReviewer === reviewer && <em>当前账号</em>}
+                </div>)}
+                <label>切换当前财务账号<select value={currentFinanceReviewer} onChange={event => setCurrentFinanceReviewer(event.target.value as FinanceReviewer)}>{financeReviewers.map(reviewer => <option key={reviewer}>{reviewer}</option>)}</select></label>
+              </div>
+              <div className="review-readonly-tip"><b>审核说明</b><span>两名财务审核没有先后顺序，必须全部通过后才同步给作者。任一人审核驳回，合同立即返回责编重新拟定；本页面只读展示腾讯电子签返回的已填充合同。</span></div>
             </aside>
           </div>
           <footer className="contract-review-footer">
-            <span>审核操作将写入合同流转记录</span>
+            <span>当前进度 {selectedFinanceApprovals.length}/2；单人通过后仍保持“待合同审核”</span>
             <button className="secondary review-reject-action" onClick={() => {setRejectReason("");setRejectModal(true);}}>审核驳回</button>
-            <button className="primary" onClick={() => setApproveConfirmOpen(true)}>审核通过</button>
+            <button className="primary" disabled={currentFinanceApproved} onClick={() => setApproveConfirmOpen(true)}>{currentFinanceApproved ? "本人已审核通过" : "审核通过"}</button>
           </footer>
         </div>
       </div>}
@@ -1471,8 +1594,8 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
           <button className="close" onClick={() => setApproveConfirmOpen(false)}>×</button>
           <div className="review-confirm-icon">?</div>
           <h2>确认合同审核无误？</h2>
-          <p>确认后合同即同步给作者签约。</p>
-          <div className="review-confirm-summary"><span>小说名称</span><b>《{selectedNovel.name}》</b><span>合同金额</span><b>¥{selectedNovel.price}</b></div>
+          <p>{selectedFinanceApprovals.length === 1 ? "确认后将满足双人审核，合同即同步给作者签约。" : "确认后记录你的审核结果，合同继续等待另一名财务审核。"}</p>
+          <div className="review-confirm-summary"><span>小说名称</span><b>《{selectedNovel.name}》</b><span>合同金额</span><b>¥{selectedNovel.price}</b><span>当前审核人</span><b>{currentFinanceReviewer}</b><span>确认后进度</span><b>{Math.min(2, selectedFinanceApprovals.length + 1)}/2</b></div>
           <div className="modal-actions"><button className="secondary" onClick={() => setApproveConfirmOpen(false)}>取消</button><button className="primary" onClick={approveContract}>确认审核通过</button></div>
         </div>
       </div>}
@@ -1486,9 +1609,9 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
               <div className="drawer-actions"><button className="secondary">查看已上传合同</button></div>
               <div className="contract-summary vertical"><div><span>合同文件</span><b>历史合同-{selectedNovel.id}.pdf（占 1 / 5）</b></div><div><span>签约方式 / 金额</span><b>{selectedNovel.contractType} / ¥{selectedNovel.price}</b></div><div><span>电子签流程 ID</span><b>无</b></div><div><span>归档方式</span><b>业务手动上传</b></div></div>
             </> : <>
-              <Badge tone={selectedState === "签署完成" ? "green" : selectedState === "待拟定合同" ? "blue" : "orange"}>{selectedState}</Badge><h2>{selectedNovel.name}</h2><p>{selectedState === "待合同审核" ? "合同版本：V1 · 待财务审核通过后创建腾讯电子签流程" : "腾讯电子签流程 ID：yDwFmUUckp****3cqjkGm"}</p>
+              <Badge tone={selectedState === "签署完成" ? "green" : selectedState === "待拟定合同" ? "blue" : "orange"}>{selectedState}</Badge><h2>{selectedNovel.name}</h2><p>{selectedState === "待合同审核" ? "合同版本：V1 · 两名财务全部通过后创建腾讯电子签流程" : "腾讯电子签流程 ID：yDwFmUUckp****3cqjkGm"}</p>
               <div className="drawer-actions">
-                {selectedState === "待合同审核" && <><button className="secondary reject-action" onClick={() => setRejectModal(true)}>驳回修改</button><button className="primary" onClick={approveContract}>财务审核通过</button></>}
+                {selectedState === "待合同审核" && <><button className="secondary reject-action" onClick={() => setRejectModal(true)}>驳回修改</button><button className="primary" disabled={currentFinanceApproved} onClick={() => setApproveConfirmOpen(true)}>{currentFinanceApproved ? "本人已审核通过" : "财务审核通过"}</button></>}
                 {selectedState === "待作者签署" && <button className="primary" onClick={() => openUrgeModal(selected)}>催签作者</button>}
                 {selectedState === "待法务签章" && <button className="primary" onClick={openLegalSeal}>法务签章</button>}
                 {selectedState === "签署完成" ? <button className="secondary" onClick={() => {setDetailOpen(false);openSignedPdf(selected);}}>在线查看合同</button> : <button className="secondary" onClick={openContractPreview}>预览合同</button>}
@@ -1497,7 +1620,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 <div><span>合同编号</span><b>{selectedState === "签署完成" ? "QS202607230018" : "签署与盖章完成后生成"}</b></div>
                 <div><span>合同模板 / 金额</span><b>{selectedNovel.contractType === "买断" ? "短篇小说版权合同（买断）" : "【模板】短篇小说版权转让合同（保底＋分成）"} / ¥{selectedNovel.price}</b></div>
                 <div><span>签约主体</span><b>杭州宝茂网络科技有限公司</b></div>
-                <div><span>财务审核</span><b>{selectedState === "待合同审核" ? "待财务·林晓曼处理" : "已通过"}</b></div>
+                <div><span>财务审核</span><b>{selectedState === "待合同审核" ? `${selectedFinanceApprovals.length}/2 已通过 · 无先后顺序` : "2/2 均已通过"}</b></div>
                 <div><span>作者签署（第 1 顺位）</span><b>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "合同审核通过后开始" : selectedState === "待作者签署" ? "待签署" : "已完成 · 主合同＋声明函"}</b></div>
                 <div><span>法务签章（第 2 顺位）</span><b>{selectedState === "签署完成" ? `已完成 · ${selectedSeal}` : selectedState === "待法务签章" ? "待法务内部确认经办人" : "等待作者先签"}</b></div>
                 <div><span>版权文件占用</span><b>{selectedState === "签署完成" ? "已签合同＋证据报告：2 / 5" : "完成后预计新增 2 个文件"}</b></div>
@@ -1505,8 +1628,8 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
               <h3>流转留痕</h3><ol className="audit-list">
                 <li><b>作者提交签约申请</b><span>{selectedNovel.author} · 实名与签约资料校验通过</span></li>
                 <li><b>责编拟定并提交合同</b><span>{selectedNovel.owner} · 模板、稿费与签署顺序已保存</span></li>
-                <li><b>{selectedState === "待合同审核" ? "等待财务审核" : "财务审核通过"}</b><span>{selectedState === "待合同审核" ? "财务·林晓曼待处理" : "通过后已自动创建电子签流程并发送作者"}</span></li>
-                <li><b>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "作者签署尚未开始" : selectedState === "待作者签署" ? "等待作者签署" : "作者签署完成"}</b><span>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "合同审核通过后自动发送作者" : selectedState === "待作者签署" ? "电子合同已同步至作者投稿后台" : "主合同与声明函签名控件均完成"}</span></li>
+                <li><b>{selectedState === "待合同审核" ? "等待双人财务审核" : "双人财务审核通过"}</b><span>{selectedState === "待合同审核" ? `${selectedFinanceApprovals.length}/2 已通过；两名财务并行审核，无先后顺序` : "2/2 均通过后已自动创建电子签流程并发送作者"}</span></li>
+                <li><b>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "作者签署尚未开始" : selectedState === "待作者签署" ? "等待作者签署" : "作者签署完成"}</b><span>{selectedState === "待合同审核" || selectedState === "待拟定合同" ? "两名财务全部通过后自动发送作者" : selectedState === "待作者签署" ? "电子合同已同步至作者投稿后台" : "主合同与声明函签名控件均完成"}</span></li>
                 <li><b>{selectedState === "签署完成" ? "法务签章完成并归档" : "等待法务手动签章"}</b><span>{selectedState === "签署完成" ? "腾讯回调成功后，合同 PDF 与证据报告已回写版权文件" : "法务内部自行确认本次经办人，由具备用印权限的法务完成签章"}</span></li>
               </ol>
             </>}
@@ -1588,7 +1711,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
         <div className="review-reject-modal" onClick={event => event.stopPropagation()}>
           <button className="close" onClick={() => setRejectModal(false)}>×</button>
           <h2>审核驳回</h2>
-          <p>请填写驳回原因。确认后合同返回责编重新拟定，审核意见将写入流转记录。</p>
+          <p>请填写驳回原因。任一财务驳回后，合同立即返回责编重新拟定，已产生的通过结果同时失效；审核意见将写入流转记录。</p>
           <label><span><b>*</b> 驳回原因</span><textarea value={rejectReason} onChange={event => setRejectReason(event.target.value)} maxLength={300} placeholder="请说明需要修改的合同条款或信息"/><small>{rejectReason.length}/300</small></label>
           <div className="modal-actions"><button className="secondary" onClick={() => setRejectModal(false)}>取消</button><button className="danger-button" disabled={!rejectReason.trim()} onClick={rejectContract}>确认驳回</button></div>
         </div>
@@ -1646,7 +1769,7 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
 
 export default function Home() {
   const [mode, setMode] = useState<"author" | "admin">("author");
-  const [states, setStates] = useState<EsignState[]>(["待作者签署", "待合同审核", "待法务签章", "待拟定合同", "签署完成"]);
+  const [states, setStates] = useState<EsignState[]>(["待作者签署", "待合同审核", "待法务签章", "待拟定合同", "签署完成", "待合同审核"]);
   return <>
     <div className="demo-switch"><div><b>小说电子签迭代 Demo</b><span>基于现有作者投稿后台与绿台小说管理</span></div><div className="segmented"><button className={mode === "author" ? "active" : ""} onClick={() => setMode("author")}>作者投稿后台</button><button className={mode === "admin" ? "active" : ""} onClick={() => setMode("admin")}>内部绿台</button></div></div>
     {mode === "author" ? <AuthorDemo state={states[0]} setState={state => setStates([state, ...states.slice(1)])}/> : <AdminDemo states={states} setStates={setStates}/>}

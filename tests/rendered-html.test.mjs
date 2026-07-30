@@ -95,3 +95,15 @@ test("does not expose legal signer identities in the seal dialog", async () => {
   assert.doesNotMatch(page, /法务人员A|法务人员B/);
   assert.doesNotMatch(page, /当前签章占用|取消并释放占用|先操作先占用/);
 });
+
+test("requires two unordered finance approvals and supports batch review", async () => {
+  const page = await readFile(new URL("app/page.tsx", projectRoot), "utf8");
+  assert.match(page, /财务审核人A/);
+  assert.match(page, /财务审核人B/);
+  assert.match(page, /两名财务并行审核、无先后顺序/);
+  assert.match(page, /两名财务全部通过后才同步给作者/);
+  assert.match(page, /批量审核合同/);
+  assert.match(page, /本次批量操作只记录当前财务的审核结果，不代替另一名财务/);
+  assert.match(page, /本人已审核通过/);
+  assert.match(page, /任一财务驳回后/);
+});
