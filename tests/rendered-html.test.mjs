@@ -107,3 +107,13 @@ test("requires two unordered finance approvals and supports batch review", async
   assert.match(page, /本人已审核通过/);
   assert.match(page, /任一财务驳回后/);
 });
+
+test("selects an author from author management with a manual fallback", async () => {
+  const page = await readFile(new URL("app/page.tsx", projectRoot), "utf8");
+  assert.match(page, /搜索并单选作者管理中的作者/);
+  assert.match(page, /优先选择作者管理已有作者/);
+  assert.match(page, /作者管理中没有？手动输入作者笔名/);
+  assert.match(page, /已关联作者管理/);
+  assert.match(page, /返回选择作者管理/);
+  assert.match(page, /作者笔名：手动录入/);
+});

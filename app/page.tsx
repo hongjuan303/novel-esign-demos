@@ -162,6 +162,14 @@ const novels = [
 
 const financeReviewers: FinanceReviewer[] = ["财务审核人A", "财务审核人B"];
 
+const managedAuthors = [
+  { id: "AU1028", penName: "溪源", legalName: "石＊京", mobile: "138 **** 6621" },
+  { id: "AU1031", penName: "猫耳朵", legalName: "陈＊然", mobile: "186 **** 5718" },
+  { id: "AU1042", penName: "苏木", legalName: "苏＊", mobile: "159 **** 2036" },
+  { id: "AU1057", penName: "南乔", legalName: "乔＊南", mobile: "137 **** 9042" },
+  { id: "AU1063", penName: "鹿鸣", legalName: "陆＊明", mobile: "188 **** 1169" },
+] as const;
+
 const templateControlGroups = [
   { group: "甲方联系人与商业金额", count: 4, source: "企业配置＋责编拟定", handling: "审核通过后由绿台 API 预填并锁定", status: "已映射" },
   { group: "作者身份、联系方式与收款账户", count: 17, source: "作者签约资料", handling: "默认同步；责编拟定时可修订，提交审核后锁定本次合同快照", status: "已映射" },
@@ -1030,6 +1038,10 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
   const [selectedSigningNovelIds, setSelectedSigningNovelIds] = useState<string[]>([]);
   const [manualNovelName, setManualNovelName] = useState("");
   const [manualNovelAuthor, setManualNovelAuthor] = useState("");
+  const [manualAuthorQuery, setManualAuthorQuery] = useState("");
+  const [manualAuthorPickerOpen, setManualAuthorPickerOpen] = useState(false);
+  const [manualAuthorInputMode, setManualAuthorInputMode] = useState(false);
+  const [selectedManagedAuthorId, setSelectedManagedAuthorId] = useState("");
   const [manualNovelAdded, setManualNovelAdded] = useState(false);
   const [toast, setToast] = useState("");
   const selectedState = states[selected];
@@ -1041,6 +1053,15 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     ? "短篇小说版权合同（买断）"
     : "【模板】短篇小说版权转让合同（保底＋分成）";
   const previewPageSrc = contractPageSrc(previewPage);
+  const selectedManagedAuthor = managedAuthors.find(author => author.id === selectedManagedAuthorId);
+  const filteredManagedAuthors = managedAuthors.filter(author => {
+    const keyword = manualAuthorQuery.trim().toLowerCase();
+    return !keyword
+      || author.penName.toLowerCase().includes(keyword)
+      || author.legalName.toLowerCase().includes(keyword)
+      || author.mobile.includes(keyword)
+      || author.id.toLowerCase().includes(keyword);
+  });
 
   function contractPageSrc(page: number) {
     return draftContractType === "买断"
@@ -1250,7 +1271,34 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     setSelectedSigningNovelIds([]);
     setManualNovelName("");
     setManualNovelAuthor("");
+    setManualAuthorQuery("");
+    setManualAuthorPickerOpen(false);
+    setManualAuthorInputMode(false);
+    setSelectedManagedAuthorId("");
     setNewNovelModalOpen(true);
+  }
+
+  function selectManagedAuthor(author: (typeof managedAuthors)[number]) {
+    setSelectedManagedAuthorId(author.id);
+    setManualNovelAuthor(author.penName);
+    setManualAuthorQuery(author.penName);
+    setManualAuthorPickerOpen(false);
+  }
+
+  function enableManualAuthorInput() {
+    setManualAuthorInputMode(true);
+    setSelectedManagedAuthorId("");
+    setManualNovelAuthor(manualAuthorQuery.trim());
+    setManualAuthorQuery("");
+    setManualAuthorPickerOpen(false);
+  }
+
+  function returnToManagedAuthorPicker() {
+    setManualAuthorInputMode(false);
+    setSelectedManagedAuthorId("");
+    setManualNovelAuthor("");
+    setManualAuthorQuery("");
+    setManualAuthorPickerOpen(true);
   }
 
   function toggleSigningNovel(novelId: string) {
@@ -1270,7 +1318,9 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     if (!manualNovelName.trim() || !manualNovelAuthor.trim()) return;
     setManualNovelAdded(true);
     setNewNovelModalOpen(false);
-    setToast(`小说《${manualNovelName.trim()}》已新建`);
+    setToast(selectedManagedAuthor
+      ? `小说《${manualNovelName.trim()}》已新建，并关联作者管理账号 ${selectedManagedAuthor.penName}`
+      : `小说《${manualNovelName.trim()}》已新建，作者笔名为手动录入`);
     setTimeout(() => setToast(""), 3200);
   }
 
@@ -1499,7 +1549,40 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
             <div className="manual-form-title"><b>小说基础信息</b><span>逻辑与当前线上“新建小说”保持一致</span></div>
             <div className="green-form-grid">
               <label>小说名称 <b>*</b><input value={manualNovelName} onChange={event => setManualNovelName(event.target.value)} placeholder="请输入小说名称"/></label>
-              <label>作者 <b>*</b><input value={manualNovelAuthor} onChange={event => setManualNovelAuthor(event.target.value)} placeholder="请输入作者笔名"/></label>
+              <div className="managed-author-field">
+                <span>作者笔名 <b>*</b></span>
+                {manualAuthorInputMode ? <div className="manual-author-input">
+                  <input autoFocus value={manualNovelAuthor} onChange={event => setManualNovelAuthor(event.target.value)} placeholder="请手动输入作者笔名"/>
+                  <em>手动录入</em>
+                  <button type="button" onClick={returnToManagedAuthorPicker}>返回选择作者管理</button>
+                </div> : <div className="managed-author-picker">
+                  <div className={manualAuthorPickerOpen ? "author-combobox active" : "author-combobox"}>
+                    <input
+                      value={manualAuthorQuery}
+                      onFocus={() => setManualAuthorPickerOpen(true)}
+                      onChange={event => {
+                        setManualAuthorQuery(event.target.value);
+                        setManualNovelAuthor("");
+                        setSelectedManagedAuthorId("");
+                        setManualAuthorPickerOpen(true);
+                      }}
+                      placeholder="搜索并单选作者管理中的作者"
+                    />
+                    <button type="button" aria-label="展开作者列表" onClick={() => setManualAuthorPickerOpen(current => !current)}>⌄</button>
+                  </div>
+                  {manualAuthorPickerOpen && <div className="managed-author-dropdown">
+                    <div className="author-picker-tip">优先选择作者管理已有作者</div>
+                    {filteredManagedAuthors.length > 0 ? filteredManagedAuthors.map(author => <button type="button" key={author.id} onClick={() => selectManagedAuthor(author)}>
+                      <i>{author.penName.slice(0, 1)}</i>
+                      <span><b>{author.penName}</b><small>{author.legalName} · {author.mobile}</small></span>
+                      <em>{author.id}</em>
+                    </button>) : <div className="author-empty-result">未找到“{manualAuthorQuery}”对应的作者</div>}
+                    <button type="button" className="manual-author-entry" onClick={enableManualAuthorInput}>＋ 作者管理中没有？手动输入作者笔名</button>
+                  </div>}
+                  {selectedManagedAuthor && <div className="linked-author-info"><b>已关联作者管理</b><span>{selectedManagedAuthor.legalName} · {selectedManagedAuthor.mobile}</span><em>{selectedManagedAuthor.id}</em></div>}
+                </div>}
+                <small className="managed-author-help">先从作者管理中下拉单选；没有对应作者时可切换为手动输入。</small>
+              </div>
               <label>编辑<select><option>富贵竹</option><option>长青</option></select></label>
               <label>责编<select><option>吴鑫鑫</option><option>柴文静</option></select></label>
               <label>所属部门<select><option>钱行工作室</option><option>七月工作室</option></select></label>
@@ -1518,7 +1601,13 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
               })}</tbody>
             </table>
           </div>}
-          <footer><span>{newNovelMode === "manual" ? "默认手动录入" : `已选择 ${selectedSigningNovelIds.length} 本小说`}</span><button className="secondary" onClick={() => setNewNovelModalOpen(false)}>取消</button>{newNovelMode === "manual" ? <button className="primary" disabled={!manualNovelName.trim() || !manualNovelAuthor.trim()} onClick={confirmManualNovel}>确定新建</button> : <button className="primary" disabled={selectedSigningNovelIds.length === 0} onClick={confirmSigningNovelSelection}>确认选择</button>}</footer>
+          <footer><span>{newNovelMode === "manual"
+            ? manualAuthorInputMode
+              ? "作者笔名：手动录入"
+              : selectedManagedAuthor
+                ? `作者笔名：已关联作者管理 · ${selectedManagedAuthor.id}`
+                : "请先从作者管理选择作者"
+            : `已选择 ${selectedSigningNovelIds.length} 本小说`}</span><button className="secondary" onClick={() => setNewNovelModalOpen(false)}>取消</button>{newNovelMode === "manual" ? <button className="primary" disabled={!manualNovelName.trim() || !manualNovelAuthor.trim()} onClick={confirmManualNovel}>确定新建</button> : <button className="primary" disabled={selectedSigningNovelIds.length === 0} onClick={confirmSigningNovelSelection}>确认选择</button>}</footer>
         </div>
       </div>}
       {batchReviewOpen && <div className="overlay batch-review-overlay" onClick={() => setBatchReviewOpen(false)}>
