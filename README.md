@@ -17,7 +17,7 @@
 - 主流程图：`public/diagrams/novel-esign-main-flow-dual-finance.png`
 - 角色泳道图：`public/diagrams/novel-esign-swimlane-dual-finance.png`
 - 可编辑主流程图：https://www.figma.com/board/WXZndQPTYF8xQr63GiFub7
-- 可编辑角色泳道图：https://www.figma.com/board/GvdS39VmSCC4k8Wq8DTXvC
+- 可编辑角色泳道图：https://www.figma.com/board/aXj0gXxLsdilcR2J5q3ejf
 - 历史兼容：旧 E签宝合同由业务手动上传；切换日前未完成的流程继续线下完成。
 
 完整需求见 [`小说电子签接入PRD-V1.3.md`](./小说电子签接入PRD-V1.3.md)。
