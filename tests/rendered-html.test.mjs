@@ -117,3 +117,16 @@ test("selects an author from author management with a manual fallback", async ()
   assert.match(page, /返回选择作者管理/);
   assert.match(page, /作者笔名：手动录入/);
 });
+
+test("configures a required editable nickname for data-permission users", async () => {
+  const page = await readFile(new URL("app/page.tsx", projectRoot), "utf8");
+  assert.match(page, /adminView === "permissions"/);
+  assert.match(page, /数据权限配置/);
+  assert.match(page, /新增用户/);
+  assert.match(page, /选择用户后，花名默认展示用户名，可直接修改/);
+  assert.match(page, /existing\?\.nickname \|\| option\?\.username/);
+  assert.match(page, /permissionNickname\.trim\(\)/);
+  assert.match(page, /请输入花名/);
+  assert.match(page, /花名用于业务展示，数据权限仍按用户ID判断/);
+  assert.match(page, /同一用户跨部门共用一个花名/);
+});

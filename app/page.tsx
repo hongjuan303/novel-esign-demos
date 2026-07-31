@@ -6,6 +6,14 @@ type EsignState = "待拟定合同" | "待合同审核" | "待作者签署" | "�
 type ImportStage = "upload" | "preview";
 type SealName = "杭州宝茂网络科技有限公司合同专用章" | "杭州宝茂网络科技有限公司公章";
 type FinanceReviewer = "财务审核人A" | "财务审核人B";
+type AdminView = "novels" | "contracts" | "permissions";
+type PermissionUser = {
+  id: string;
+  username: string;
+  nickname: string;
+  role: string;
+  department: string;
+};
 type AuthorExistingNovelKey = "contract" | "pending" | "draft" | "completed";
 type AuthorNovelEditValues = {
   name: string;
@@ -169,6 +177,23 @@ const managedAuthors = [
   { id: "AU1057", penName: "南乔", legalName: "乔＊南", mobile: "137 **** 9042" },
   { id: "AU1063", penName: "鹿鸣", legalName: "陆＊明", mobile: "188 **** 1169" },
 ] as const;
+
+const permissionUserOptions = [
+  { id: "U1001", username: "王娅" },
+  { id: "U1002", username: "赵婷婷" },
+  { id: "U1003", username: "黄雅婕" },
+  { id: "U1004", username: "唐娟" },
+  { id: "U1005", username: "刘萌" },
+  { id: "U1006", username: "洪娟" },
+] as const;
+
+const initialPermissionUsers: PermissionUser[] = [
+  { id: "U1001", username: "王娅", nickname: "王娅", role: "主编", department: "钱行工作室" },
+  { id: "U1002", username: "赵婷婷", nickname: "婷婷", role: "责编", department: "钱行工作室" },
+  { id: "U1003", username: "黄雅婕", nickname: "雅婕", role: "责编", department: "钱行工作室" },
+  { id: "U1004", username: "唐娟", nickname: "娟娟", role: "财务", department: "七月工作室" },
+  { id: "U1005", username: "刘萌", nickname: "刘萌", role: "经理", department: "七月工作室" },
+];
 
 const templateControlGroups = [
   { group: "甲方联系人与商业金额", count: 4, source: "企业配置＋责编拟定", handling: "审核通过后由绿台 API 预填并锁定", status: "已映射" },
@@ -990,7 +1015,7 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
 }
 
 function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (states: EsignState[]) => void }) {
-  const [adminView, setAdminView] = useState<"novels" | "contracts">("contracts");
+  const [adminView, setAdminView] = useState<AdminView>("contracts");
   const [selected, setSelected] = useState(0);
   const [launchModal, setLaunchModal] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -1043,6 +1068,15 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
   const [manualAuthorInputMode, setManualAuthorInputMode] = useState(false);
   const [selectedManagedAuthorId, setSelectedManagedAuthorId] = useState("");
   const [manualNovelAdded, setManualNovelAdded] = useState(false);
+  const [permissionDepartment, setPermissionDepartment] = useState("钱行工作室");
+  const [permissionQuery, setPermissionQuery] = useState("");
+  const [permissionUsers, setPermissionUsers] = useState<PermissionUser[]>(initialPermissionUsers);
+  const [permissionUserModalOpen, setPermissionUserModalOpen] = useState(false);
+  const [permissionEditingUserId, setPermissionEditingUserId] = useState("");
+  const [permissionSelectedUserId, setPermissionSelectedUserId] = useState("");
+  const [permissionRole, setPermissionRole] = useState("");
+  const [permissionNickname, setPermissionNickname] = useState("");
+  const [permissionNicknameTouched, setPermissionNicknameTouched] = useState(false);
   const [toast, setToast] = useState("");
   const selectedState = states[selected];
   const selectedNovel = novels[selected];
@@ -1061,6 +1095,13 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
       || author.legalName.toLowerCase().includes(keyword)
       || author.mobile.includes(keyword)
       || author.id.toLowerCase().includes(keyword);
+  });
+  const filteredPermissionUsers = permissionUsers.filter(user => {
+    const keyword = permissionQuery.trim().toLowerCase();
+    return user.department === permissionDepartment
+      && (!keyword
+        || user.username.toLowerCase().includes(keyword)
+        || user.nickname.toLowerCase().includes(keyword));
   });
 
   function contractPageSrc(page: number) {
@@ -1324,6 +1365,72 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
     setTimeout(() => setToast(""), 3200);
   }
 
+  function openAddPermissionUser() {
+    setPermissionEditingUserId("");
+    setPermissionSelectedUserId("");
+    setPermissionRole("");
+    setPermissionNickname("");
+    setPermissionNicknameTouched(false);
+    setPermissionUserModalOpen(true);
+  }
+
+  function openEditPermissionUser(user: PermissionUser) {
+    setPermissionEditingUserId(user.id);
+    setPermissionSelectedUserId(user.id);
+    setPermissionRole(user.role);
+    setPermissionNickname(user.nickname || user.username);
+    setPermissionNicknameTouched(false);
+    setPermissionUserModalOpen(true);
+  }
+
+  function selectPermissionUser(userId: string) {
+    const option = permissionUserOptions.find(user => user.id === userId);
+    const existing = permissionUsers.find(user => user.id === userId);
+    setPermissionSelectedUserId(userId);
+    setPermissionNickname(existing?.nickname || option?.username || "");
+    setPermissionNicknameTouched(false);
+  }
+
+  function savePermissionUser() {
+    const option = permissionUserOptions.find(user => user.id === permissionSelectedUserId);
+    const nickname = permissionNickname.trim();
+    if (!option || !permissionRole || !nickname) {
+      setPermissionNicknameTouched(true);
+      return;
+    }
+
+    setPermissionUsers(current => {
+      const sameUserNickname = current.find(user => user.id === option.id)?.nickname;
+      const nextNickname = nickname || sameUserNickname || option.username;
+      if (permissionEditingUserId) {
+        return current.map(user => user.id === permissionEditingUserId
+          ? { ...user, username: option.username, nickname: nextNickname, role: permissionRole }
+          : user.id === option.id
+            ? { ...user, nickname: nextNickname }
+            : user);
+      }
+      const existingInDepartment = current.find(user => user.id === option.id && user.department === permissionDepartment);
+      if (existingInDepartment) {
+        return current.map(user => user.id === option.id
+          ? { ...user, nickname: nextNickname, role: user.department === permissionDepartment ? permissionRole : user.role }
+          : user);
+      }
+      return [
+        ...current.map(user => user.id === option.id ? { ...user, nickname: nextNickname } : user),
+        { id: option.id, username: option.username, nickname: nextNickname, role: permissionRole, department: permissionDepartment },
+      ];
+    });
+    setPermissionUserModalOpen(false);
+    setToast(permissionEditingUserId ? "用户配置已更新" : "用户已添加，花名配置已保存");
+    setTimeout(() => setToast(""), 3200);
+  }
+
+  function removePermissionUser(user: PermissionUser) {
+    setPermissionUsers(current => current.filter(item => !(item.id === user.id && item.department === permissionDepartment)));
+    setToast(`已从${permissionDepartment}移除用户${user.nickname}`);
+    setTimeout(() => setToast(""), 3200);
+  }
+
   function openLegalSealFor(index: number) {
     setSelected(index);
     setDraftContractType(novels[index].contractType as "买断" | "保底＋分成");
@@ -1365,11 +1472,11 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
         <div className="green-menu-group">◈ 小说管理 <span>⌃</span></div>
         <button className={`green-sub ${adminView === "novels" ? "active" : ""}`} onClick={() => setAdminView("novels")}>小说管理</button>
         <button className={`green-sub contract-menu ${adminView === "contracts" ? "active" : ""}`} onClick={() => setAdminView("contracts")}><span>签约管理</span><i>{states.filter(state => state !== "签署完成" && state !== "已拒绝签约").length}</i></button>
-        <div className="green-sub">小说标签管理</div><div className="green-sub">数据权限配置</div><div className="green-sub">小说送审库</div><div className="green-sub">小说配置栏目</div><div className="green-sub">CP合作管理</div>
+        <div className="green-sub">小说标签管理</div><button className={`green-sub ${adminView === "permissions" ? "active" : ""}`} onClick={() => setAdminView("permissions")}>数据权限配置</button><div className="green-sub">小说送审库</div><div className="green-sub">小说配置栏目</div><div className="green-sub">CP合作管理</div>
         <div className="green-menu-item">◉ 公众号管理</div>
       </aside>
       <div className="green-shell">
-        <header className="green-header"><span>☰</span><b>小说管理　/　{adminView === "contracts" ? "签约管理" : "小说管理"}</b><span className="challenge">百日0故障挑战 第324天</span><span>洪娟⌄</span></header>
+        <header className="green-header"><span>☰</span><b>小说管理　/　{adminView === "contracts" ? "签约管理" : adminView === "permissions" ? "数据权限配置" : "小说管理"}</b><span className="challenge">百日0故障挑战 第324天</span><span>洪娟⌄</span></header>
         <main className="green-content">
           {adminView === "contracts" ? <>
             <div className="green-tab">签约管理　×</div>
@@ -1426,6 +1533,38 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 </table>
             </section>
             <div className="pagination">共 {novels.filter(novel => !novel.legacy).length} 条　 <span>20条/页⌄</span>　‹　<b>1</b>　›</div>
+          </> : adminView === "permissions" ? <>
+          <div className="green-tab">数据权限配置　×</div>
+          <section className="permission-config-page">
+            <aside className="permission-department-list">
+              <button className="primary small">新增部门</button>
+              {["钱行工作室", "七月工作室", "测试的部门", "灵巧工作室"].map(department => <button
+                key={department}
+                className={permissionDepartment === department ? "active" : ""}
+                onClick={() => setPermissionDepartment(department)}
+              ><span>{department}</span><i>✎　⌫</i></button>)}
+            </aside>
+            <div className="permission-user-panel">
+              <div className="permission-user-filters">
+                <label>用户<input value={permissionQuery} onChange={event => setPermissionQuery(event.target.value)} placeholder="请输入用户名或花名"/></label>
+                <button className="primary small">查询</button>
+                <button className="permission-add-user" onClick={openAddPermissionUser}>新增用户</button>
+              </div>
+              <table className="permission-user-table">
+                <thead><tr><th>用户</th><th>花名</th><th>角色</th><th>操作</th></tr></thead>
+                <tbody>{filteredPermissionUsers.length > 0 ? filteredPermissionUsers.map(user => <tr key={`${user.department}-${user.id}`}>
+                  <td>{user.username}</td>
+                  <td><b>{user.nickname}</b></td>
+                  <td>{user.role}</td>
+                  <td><button onClick={() => openEditPermissionUser(user)}>编辑</button><button className="danger-link" onClick={() => removePermissionUser(user)}>删除</button></td>
+                </tr>) : <tr><td colSpan={4} className="permission-empty">当前部门暂无用户</td></tr>}</tbody>
+              </table>
+              <div className="permission-rule-note">
+                <b>花名用于业务展示，数据权限仍按用户ID判断</b>
+                <span>同一用户跨部门共用一个花名；修改花名不会改变角色、部门归属或既有数据权限。</span>
+              </div>
+            </div>
+          </section>
           </> : <>
           <div className="green-tab">小说管理　×</div>
           <section className="green-filters">
@@ -1608,6 +1747,28 @@ function AdminDemo({ states, setStates }: { states: EsignState[]; setStates: (st
                 ? `作者笔名：已关联作者管理 · ${selectedManagedAuthor.id}`
                 : "请先从作者管理选择作者"
             : `已选择 ${selectedSigningNovelIds.length} 本小说`}</span><button className="secondary" onClick={() => setNewNovelModalOpen(false)}>取消</button>{newNovelMode === "manual" ? <button className="primary" disabled={!manualNovelName.trim() || !manualNovelAuthor.trim()} onClick={confirmManualNovel}>确定新建</button> : <button className="primary" disabled={selectedSigningNovelIds.length === 0} onClick={confirmSigningNovelSelection}>确认选择</button>}</footer>
+        </div>
+      </div>}
+      {permissionUserModalOpen && <div className="overlay permission-user-overlay" onClick={() => setPermissionUserModalOpen(false)}>
+        <div className="permission-user-modal" onClick={event => event.stopPropagation()}>
+          <header><h2>{permissionEditingUserId ? "编辑用户" : "新增用户"}</h2><button className="close" onClick={() => setPermissionUserModalOpen(false)}>×</button></header>
+          <div className="permission-user-form">
+            <label><span><b>*</b> 用户</span><select value={permissionSelectedUserId} disabled={Boolean(permissionEditingUserId)} onChange={event => selectPermissionUser(event.target.value)}>
+              <option value="">请选择</option>
+              {permissionUserOptions.map(user => <option key={user.id} value={user.id}>{user.username}</option>)}
+            </select></label>
+            <label><span><b>*</b> 角色</span><select value={permissionRole} onChange={event => setPermissionRole(event.target.value)}>
+              <option value="">请选择</option><option>责编</option><option>主编</option><option>经理</option><option>财务</option><option>法务</option>
+            </select></label>
+            <label><span><b>*</b> 花名</span><div><input
+              value={permissionNickname}
+              maxLength={20}
+              onBlur={() => setPermissionNicknameTouched(true)}
+              onChange={event => { setPermissionNickname(event.target.value); setPermissionNicknameTouched(true); }}
+              placeholder={permissionSelectedUserId ? "请输入花名" : "选择用户后自动带入用户名"}
+            />{permissionNicknameTouched && !permissionNickname.trim() && <small>请输入花名</small>}<em>{permissionNickname.length}/20</em></div></label>
+          </div>
+          <footer><span>选择用户后，花名默认展示用户名，可直接修改。</span><button className="secondary" onClick={() => setPermissionUserModalOpen(false)}>取消</button><button className="primary" disabled={!permissionSelectedUserId || !permissionRole || !permissionNickname.trim()} onClick={savePermissionUser}>确定</button></footer>
         </div>
       </div>}
       {batchReviewOpen && <div className="overlay batch-review-overlay" onClick={() => setBatchReviewOpen(false)}>
