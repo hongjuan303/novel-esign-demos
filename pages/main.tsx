@@ -3,14 +3,16 @@ import { createRoot } from "react-dom/client";
 import Home from "../app/page";
 import "../app/globals.css";
 
-const root = document.getElementById("root");
+if (typeof document !== "undefined") {
+  const root = document.getElementById("root");
 
-if (!root) {
-  throw new Error("Missing #root mount element");
+  if (!root) {
+    throw new Error("Missing #root mount element");
+  }
+
+  createRoot(root).render(
+    <StrictMode>
+      <Home />
+    </StrictMode>,
+  );
 }
-
-createRoot(root).render(
-  <StrictMode>
-    <Home />
-  </StrictMode>,
-);
