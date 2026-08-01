@@ -384,7 +384,6 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
   const [signModal, setSignModal] = useState(false);
   const [applyModal, setApplyModal] = useState(false);
   const [applyTarget, setApplyTarget] = useState<"created" | "existing">("existing");
-  const [signing, setSigning] = useState(false);
   const [profileEditing, setProfileEditing] = useState(false);
   const [toast, setToast] = useState("");
   const [createNovelModal, setCreateNovelModal] = useState(false);
@@ -432,16 +431,6 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
   function notify(message: string) {
     setToast(message);
     setTimeout(() => setToast(""), 3200);
-  }
-
-  function completeAuthorSign() {
-    setSigning(true);
-    setTimeout(() => {
-      setSigning(false);
-      setSignModal(false);
-      setState("待法务签章");
-      notify("作者签署已完成，合同正等待法务签章");
-    }, 900);
   }
 
   const createNovelValid =
@@ -630,6 +619,12 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     setDeletedWorkKeys(current => current.includes(key) ? current : [...current, key]);
     setDeleteWorkTarget(null);
     notify(`小说《${name}》已删除`);
+  }
+
+  function copyAuthorSigningLink() {
+    const signingUrl = "https://hongjuan303.github.io/html-prototypes/novel-esign-demos/?action=sign";
+    void navigator.clipboard?.writeText(signingUrl).catch(() => undefined);
+    notify("签署链接已复制，请在手机浏览器打开");
   }
 
   function openGuideEditor() {
@@ -1026,7 +1021,15 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
             <div><span>乙方</span><b>石＊京（笔名：溪源）</b></div>
           </div>
           <div className="signature-scope"><b>本次需完成 2 处签名</b><span>① 主合同签署页　② 附件《版权转让声明函》</span></div>
-          <button className="mint-button wide" disabled={signing} onClick={state === "待作者签署" ? completeAuthorSign : () => notify("已打开腾讯电子签合同进度")}>{signing ? "正在同步签署结果…" : "前往腾讯电子签"}</button>
+          {state === "待作者签署" ? <div className="author-signing-qr-panel">
+            <img src={`${import.meta.env.BASE_URL}signing-qr.svg`} alt="腾讯电子签签署二维码"/>
+            <div>
+              <b>请使用手机扫码签署</b>
+              <p>请使用手机微信或手机浏览器扫码，进入腾讯电子签完成 2 处签名。</p>
+              <small>二维码有效期 30 分钟，过期后请刷新页面重新获取</small>
+              <button className="soft-button" onClick={copyAuthorSigningLink}>复制签署链接</button>
+            </div>
+          </div> : <div className="author-signing-wait-note">作者已签署，正在等待法务完成企业签章</div>}
         </>}
         {state === "签署完成" && <>
           <div className="sign-progress-summary">
