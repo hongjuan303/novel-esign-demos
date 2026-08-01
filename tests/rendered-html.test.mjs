@@ -71,7 +71,7 @@ test("matches the confirmed author work and income rules", async () => {
   const page = await readFile(new URL("app/page.tsx", projectRoot), "utf8");
   assert.match(
     page,
-    /草稿[\s\S]*待签约[\s\S]*签约中[\s\S]*签约完成/,
+    /草稿[\s\S]*待签约[\s\S]*签约中[\s\S]*签约完成[\s\S]*签约终止/,
   );
   assert.match(page, /申请签约/);
   assert.match(page, /查看进度/);
@@ -93,6 +93,8 @@ test("matches the confirmed author work and income rules", async () => {
   assert.match(page, /小说《\$\{name\}》已删除/);
   assert.doesNotMatch(page, /溪源 著/);
   assert.doesNotMatch(page, />小说详情<\/button>/);
+  assert.match(page, /live-status terminated">签约终止/);
+  assert.match(page, /该小说签约终止，如有疑问请联系编辑确认/);
   assert.match(page, /小说详情/);
   assert.match(page, /签约日期/);
   assert.doesNotMatch(page, /到账状态/);
@@ -139,4 +141,13 @@ test("configures a required editable nickname for data-permission users", async 
   assert.match(page, /请输入花名/);
   assert.match(page, /花名用于业务展示，数据权限仍按用户ID判断/);
   assert.match(page, /同一用户跨部门共用一个花名/);
+});
+
+test("lets an author without a contract editor choose one", async () => {
+  const page = await readFile(new URL("app/page.tsx", projectRoot), "utf8");
+  assert.match(page, /请选择签约编辑/);
+  assert.match(page, /aria-label="选择签约编辑"/);
+  assert.match(page, /确认选择/);
+  assert.match(page, /签约编辑已绑定为/);
+  assert.match(page, /disabled=\{!pendingContractEditor\}/);
 });

@@ -14,7 +14,7 @@ type PermissionUser = {
   role: string;
   department: string;
 };
-type AuthorExistingNovelKey = "contract" | "pending" | "draft" | "completed";
+type AuthorExistingNovelKey = "contract" | "pending" | "draft" | "completed" | "terminated";
 type AuthorNovelEditValues = {
   name: string;
   intro: string;
@@ -66,6 +66,16 @@ const authorNovelDefaults: Record<AuthorExistingNovelKey, AuthorNovelEditValues>
     novelType: "短篇",
     customCover: true,
     coverClass: "rose",
+  },
+  terminated: {
+    name: "潮汐退去之后",
+    intro: "一场搁置多年的版权合作在潮水退去后告一段落，她也终于开始书写新的故事。",
+    finishDate: "2026-07-18",
+    tags: ["现实生活", "女性成长"],
+    category: "女频",
+    novelType: "短篇",
+    customCover: true,
+    coverClass: "teal",
   },
 };
 
@@ -385,6 +395,8 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
   const [applyModal, setApplyModal] = useState(false);
   const [applyTarget, setApplyTarget] = useState<"created" | "existing">("existing");
   const [profileEditing, setProfileEditing] = useState(false);
+  const [contractEditor, setContractEditor] = useState("");
+  const [pendingContractEditor, setPendingContractEditor] = useState("");
   const [toast, setToast] = useState("");
   const [createNovelModal, setCreateNovelModal] = useState(false);
   const [importNovelModal, setImportNovelModal] = useState(false);
@@ -627,6 +639,12 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     notify("签署链接已复制，请在手机浏览器打开");
   }
 
+  function bindContractEditor() {
+    if (!pendingContractEditor) return;
+    setContractEditor(pendingContractEditor);
+    notify(`签约编辑已绑定为${pendingContractEditor}`);
+  }
+
   function openGuideEditor() {
     setGuideDraft(isNewDraftDetail ? novelIntro : existingGuide);
     setGuideEditorOpen(true);
@@ -660,7 +678,7 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     { id: "editors", label: "联系编辑", icon: "✉" },
   ] as const;
 
-  const visibleWorkCount = (["contract", "pending", "draft", "completed"] as AuthorExistingNovelKey[])
+  const visibleWorkCount = (["contract", "pending", "draft", "completed", "terminated"] as AuthorExistingNovelKey[])
     .filter(key => !deletedWorkKeys.includes(key)).length
     + (draftCreated && !deletedWorkKeys.includes("created") ? 1 : 0);
 
@@ -680,7 +698,7 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
         <main className="author-live-main">
           {view === "works" && <>
             <section className="author-live-filter">
-              <select defaultValue="all"><option value="all">全部状态</option><option>草稿</option><option>待签约</option><option>签约中</option><option>签约完成</option></select>
+              <select defaultValue="all"><option value="all">全部状态</option><option>草稿</option><option>待签约</option><option>签约中</option><option>签约完成</option><option>签约终止</option></select>
               <input placeholder="⌕ 查询小说名称" />
               <button className="mint-button">查 询</button>
               <button className="mint-button create" onClick={openCreateNovel}>⊕ 新建小说</button>
@@ -742,6 +760,14 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
                 <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("completed")}>{existingNovelEdits.completed.name}</button><span className="live-status done">签约完成</span></div><small>12,604字　｜　女频 · 现实情感</small></div>
                 <div className="live-work-actions"><button className="pill-action soft" onClick={() => openEditNovel("completed")}>编辑</button><button className="pill-action delete-work-action" onClick={() => setDeleteWorkTarget({key: "completed", name: existingNovelEdits.completed.name})}>删除</button></div>
               </article>}
+
+              {!deletedWorkKeys.includes("terminated") && <article className="author-work-row terminated-row">
+                <button className="work-cover-link" aria-label={`打开《${existingNovelEdits.terminated.name}》小说详情`} onClick={() => openExistingNovelDetail("terminated")}>
+                  <span className={`live-cover ${existingNovelEdits.terminated.customCover ? existingNovelEdits.terminated.coverClass : "generated"}`}>{existingNovelEdits.terminated.name}</span>
+                </button>
+                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("terminated")}>{existingNovelEdits.terminated.name}</button><span className="live-status terminated">签约终止</span></div><small>9,116字　｜　女频 · 现实生活</small><div className="live-contract-line terminated">该小说签约终止，如有疑问请联系编辑确认</div></div>
+                <div className="live-work-actions"><button className="pill-action soft" onClick={() => openEditNovel("terminated")}>编辑</button><button className="pill-action delete-work-action" onClick={() => setDeleteWorkTarget({key: "terminated", name: existingNovelEdits.terminated.name})}>删除</button></div>
+              </article>}
             </section>
             <div className="author-pagination">共 {visibleWorkCount} 条　‹　<b>1</b>　›　 <span>10 条/页⌄</span></div>
           </>}
@@ -764,7 +790,10 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
               <label><span>姓名</span>{profileEditing ? <input defaultValue="石雨京"/> : <b>石雨京</b>}</label>
               <label><span>笔名</span>{profileEditing ? <input defaultValue="溪源"/> : <b>溪源</b>}</label>
               <label><span>手机号</span><b>189****4513</b></label>
-              <label><span>签约编辑</span><b>长青</b></label>
+              <label className="profile-contract-editor"><span>签约编辑</span>{contractEditor
+                ? <b>{contractEditor}</b>
+                : <div><select aria-label="选择签约编辑" value={pendingContractEditor} onChange={event => setPendingContractEditor(event.target.value)}><option value="">请选择签约编辑</option><option>长青</option><option>泡芙</option><option>元元</option></select><button className="mint-button small" disabled={!pendingContractEditor} onClick={bindContractEditor}>确认选择</button></div>}
+              </label>
             </div>
             <div className="profile-section-heading second"><h2>签约信息</h2><button className="mint-button small" onClick={() => setProfileEditing(!profileEditing)}>{profileEditing ? "保存" : "修改信息"}</button></div>
             <div className="profile-fields">
