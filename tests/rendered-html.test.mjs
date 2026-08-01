@@ -78,6 +78,8 @@ test("matches the confirmed author work and income rules", async () => {
   assert.match(page, /编辑小说信息/);
   assert.match(page, /work-cover-link/);
   assert.match(page, /责编正在拟定合同中，请稍后查看进度/);
+  assert.match(page, /合同名称[\s\S]*签约税前金额/);
+  assert.doesNotMatch(page, /state === "签署完成" \? "电子合同详情" : "签约进度"/);
   assert.match(page, /签约税前金额/);
   assert.match(page, /本次需完成 2 处签名/);
   assert.match(page, /前往腾讯电子签/);

@@ -1017,9 +1017,10 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
       </div>}
 
       {signModal && <div className="overlay" onClick={() => setSignModal(false)}><div className="author-contract-modal live-style" onClick={event => event.stopPropagation()}>
-        <button className="close" onClick={() => setSignModal(false)}>×</button><div className="tencent-mark">✓ 腾讯电子签</div><h2>{state === "签署完成" ? "电子合同详情" : "签约进度"}</h2><p>《{existingNovelEdits.contract.name}》版权转让合同（保底＋分成）</p>
+        <button className="close" onClick={() => setSignModal(false)}>×</button><div className="tencent-mark">✓ 腾讯电子签</div>{state === "签署完成" && <h2>电子合同详情</h2>}
         {(state === "待作者签署" || state === "待法务签章") && <>
           <div className="sign-progress-summary">
+            <div><span>合同名称</span><b>《{existingNovelEdits.contract.name}》版权转让合同（保底＋分成）</b></div>
             <div><span>签约税前金额</span><b className="money">¥12,000.00</b></div>
             <div><span>甲方</span><b>杭州宝茂网络科技有限公司</b></div>
             <div><span>乙方</span><b>石＊京（笔名：溪源）</b></div>
@@ -1029,6 +1030,7 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
         </>}
         {state === "签署完成" && <>
           <div className="sign-progress-summary">
+            <div><span>合同名称</span><b>《{existingNovelEdits.contract.name}》版权转让合同（保底＋分成）</b></div>
             <div><span>签约税前金额</span><b className="money">¥12,000.00</b></div>
             <div><span>甲方</span><b>杭州宝茂网络科技有限公司</b></div>
             <div><span>乙方</span><b>石＊京（笔名：溪源）</b></div>
