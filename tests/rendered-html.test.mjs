@@ -82,6 +82,11 @@ test("matches the confirmed author work and income rules", async () => {
   assert.match(page, /本次需完成 2 处签名/);
   assert.match(page, /前往腾讯电子签/);
   assert.match(page, />编辑<\/button>/);
+  assert.match(page, />删除<\/button>/);
+  assert.match(page, /确认删除该本小说吗\?/);
+  assert.match(page, /小说一旦删除，将无法恢复/);
+  assert.match(page, /小说《\$\{name\}》已删除/);
+  assert.doesNotMatch(page, /溪源 著/);
   assert.doesNotMatch(page, />小说详情<\/button>/);
   assert.match(page, /小说详情/);
   assert.match(page, /签约日期/);

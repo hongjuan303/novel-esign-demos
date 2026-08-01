@@ -407,6 +407,8 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
   const [addedChapter, setAddedChapter] = useState(false);
   const [deletedChapterIds, setDeletedChapterIds] = useState<number[]>([]);
   const [deleteChapterId, setDeleteChapterId] = useState<number | null>(null);
+  const [deletedWorkKeys, setDeletedWorkKeys] = useState<Array<"created" | AuthorExistingNovelKey>>([]);
+  const [deleteWorkTarget, setDeleteWorkTarget] = useState<{ key: "created" | AuthorExistingNovelKey; name: string } | null>(null);
   const [guideEditorOpen, setGuideEditorOpen] = useState(false);
   const [guideDraft, setGuideDraft] = useState("");
   const [existingGuide, setExistingGuide] = useState(existingNovelGuide);
@@ -622,6 +624,14 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     notify(`${chapter?.title || "章节"}已删除`);
   }
 
+  function confirmDeleteWork() {
+    if (!deleteWorkTarget) return;
+    const { key, name } = deleteWorkTarget;
+    setDeletedWorkKeys(current => current.includes(key) ? current : [...current, key]);
+    setDeleteWorkTarget(null);
+    notify(`小说《${name}》已删除`);
+  }
+
   function openGuideEditor() {
     setGuideDraft(isNewDraftDetail ? novelIntro : existingGuide);
     setGuideEditorOpen(true);
@@ -655,6 +665,10 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
     { id: "editors", label: "联系编辑", icon: "✉" },
   ] as const;
 
+  const visibleWorkCount = (["contract", "pending", "draft", "completed"] as AuthorExistingNovelKey[])
+    .filter(key => !deletedWorkKeys.includes(key)).length
+    + (draftCreated && !deletedWorkKeys.includes("created") ? 1 : 0);
+
   return (
     <div className="product author-app-live">
       <header className="live-author-header">
@@ -677,13 +691,12 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
               <button className="mint-button create" onClick={openCreateNovel}>⊕ 新建小说</button>
             </section>
             <section className="author-work-list">
-              {draftCreated && <article className="author-work-row new-draft-row">
+              {draftCreated && !deletedWorkKeys.includes("created") && <article className="author-work-row new-draft-row">
                 <button className="work-cover-link" aria-label={`打开《${novelName}》小说详情`} onClick={() => setView("draftContent")}>
                   <span className={`live-cover generated ${customCover ? "custom" : ""}`}><span>{novelName}</span></span>
                 </button>
                 <div className="live-work-main">
                   <div className="live-work-title"><button className="work-title-link" onClick={() => setView("draftContent")}>{novelName}</button><span className={`live-status ${draftApplied ? "waiting" : "draft"}`}>{draftApplied ? "待签约" : "草稿"}</span></div>
-                  <p>溪源 著</p>
                   <small>{draftImported ? "9,486字" : "0字"}　｜　{category} · {novelType} · {novelTags.join("、")}</small>
                   {draftApplied && <div className="live-contract-line plain">签约申请已提交，责编正在拟定合同</div>}
                 </div>
@@ -692,48 +705,50 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
                     ? <button className="inline-mint" onClick={() => setPendingProgressOpen(true)}>查看进度</button>
                     : <button className="inline-mint" onClick={() => {if (!draftImported) {notify("请先导入小说正文，再申请签约"); return;} setApplyTarget("created"); setApplyModal(true);}}>♢ 申请签约</button>}
                   <button className="pill-action soft" onClick={() => openEditNovel("created")}>编辑</button>
+                  <button className="pill-action delete-work-action" onClick={() => setDeleteWorkTarget({key: "created", name: novelName})}>删除</button>
                 </div>
               </article>}
-              <article className="author-work-row contract-row">
+              {!deletedWorkKeys.includes("contract") && <article className="author-work-row contract-row">
                 <button className="work-cover-link" aria-label={`打开《${existingNovelEdits.contract.name}》小说详情`} onClick={() => openExistingNovelDetail("contract")}>
                   <span className={`live-cover ${existingNovelEdits.contract.customCover ? existingNovelEdits.contract.coverClass : "generated"}`}>{existingNovelEdits.contract.name}</span>
                 </button>
                 <div className="live-work-main">
                   <div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("contract")}>{existingNovelEdits.contract.name}</button><span className={`live-status ${state === "签署完成" ? "done" : stateCopy.label === "草稿" ? "draft" : "waiting"}`}>{stateCopy.label}</span></div>
-                  <p>溪源 著</p><small>9,427字　｜　女频 · 都市情感</small>
+                  <small>9,427字　｜　女频 · 都市情感</small>
                   {stateCopy.label !== "草稿" && stateCopy.label !== "签约完成" && <div className="live-contract-line"><b>{stateCopy.detail}</b>{state === "待作者签署" && <span>请及时完成合同核对</span>}</div>}
                 </div>
                 <div className="live-work-actions">
                   {state !== "签署完成" && <button className="inline-mint" onClick={() => state === "待拟定合同" || state === "待合同审核" ? setPendingProgressOpen(true) : setSignModal(true)}>查看进度</button>}
                   <button className="pill-action soft" onClick={() => openEditNovel("contract")}>编辑</button>
+                  <button className="pill-action delete-work-action" onClick={() => setDeleteWorkTarget({key: "contract", name: existingNovelEdits.contract.name})}>删除</button>
                 </div>
-              </article>
+              </article>}
 
-              <article className="author-work-row">
+              {!deletedWorkKeys.includes("pending") && <article className="author-work-row">
                 <button className="work-cover-link" aria-label={`打开《${existingNovelEdits.pending.name}》小说详情`} onClick={() => openExistingNovelDetail("pending")}>
                   <span className={`live-cover ${existingNovelEdits.pending.customCover ? existingNovelEdits.pending.coverClass : "generated"}`}>{existingNovelEdits.pending.name}</span>
                 </button>
-                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("pending")}>{existingNovelEdits.pending.name}</button><span className="live-status waiting">待签约</span></div><p>溪源 著</p><small>10,029字　｜　女频 · 悬疑</small><div className="live-contract-line plain">签约申请已提交，责编正在拟定合同</div></div>
-                <div className="live-work-actions"><button className="inline-mint" onClick={() => setPendingProgressOpen(true)}>查看进度</button><button className="pill-action soft" onClick={() => openEditNovel("pending")}>编辑</button></div>
-              </article>
+                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("pending")}>{existingNovelEdits.pending.name}</button><span className="live-status waiting">待签约</span></div><small>10,029字　｜　女频 · 悬疑</small><div className="live-contract-line plain">签约申请已提交，责编正在拟定合同</div></div>
+                <div className="live-work-actions"><button className="inline-mint" onClick={() => setPendingProgressOpen(true)}>查看进度</button><button className="pill-action soft" onClick={() => openEditNovel("pending")}>编辑</button><button className="pill-action delete-work-action" onClick={() => setDeleteWorkTarget({key: "pending", name: existingNovelEdits.pending.name})}>删除</button></div>
+              </article>}
 
-              <article className="author-work-row">
+              {!deletedWorkKeys.includes("draft") && <article className="author-work-row">
                 <button className="work-cover-link" aria-label={`打开《${existingNovelEdits.draft.name}》小说详情`} onClick={() => openExistingNovelDetail("draft")}>
                   <span className={`live-cover ${existingNovelEdits.draft.customCover ? existingNovelEdits.draft.coverClass : "generated"}`}>{existingNovelEdits.draft.name}</span>
                 </button>
-                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("draft")}>{existingNovelEdits.draft.name}</button><span className={`live-status ${existingDraftApplied ? "waiting" : "draft"}`}>{existingDraftApplied ? "待签约" : "草稿"}</span></div><p>溪源 著</p><small>8,832字　｜　男频 · 都市</small>{existingDraftApplied && <div className="live-contract-line plain">签约申请已提交，责编正在拟定合同</div>}</div>
-                <div className="live-work-actions">{existingDraftApplied ? <button className="inline-mint" onClick={() => setPendingProgressOpen(true)}>查看进度</button> : <button className="inline-mint" onClick={() => {setApplyTarget("existing");setApplyModal(true);}}>♢ 申请签约</button>}<button className="pill-action soft" onClick={() => openEditNovel("draft")}>编辑</button></div>
-              </article>
+                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("draft")}>{existingNovelEdits.draft.name}</button><span className={`live-status ${existingDraftApplied ? "waiting" : "draft"}`}>{existingDraftApplied ? "待签约" : "草稿"}</span></div><small>8,832字　｜　男频 · 都市</small>{existingDraftApplied && <div className="live-contract-line plain">签约申请已提交，责编正在拟定合同</div>}</div>
+                <div className="live-work-actions">{existingDraftApplied ? <button className="inline-mint" onClick={() => setPendingProgressOpen(true)}>查看进度</button> : <button className="inline-mint" onClick={() => {setApplyTarget("existing");setApplyModal(true);}}>♢ 申请签约</button>}<button className="pill-action soft" onClick={() => openEditNovel("draft")}>编辑</button><button className="pill-action delete-work-action" onClick={() => setDeleteWorkTarget({key: "draft", name: existingNovelEdits.draft.name})}>删除</button></div>
+              </article>}
 
-              <article className="author-work-row">
+              {!deletedWorkKeys.includes("completed") && <article className="author-work-row">
                 <button className="work-cover-link" aria-label={`打开《${existingNovelEdits.completed.name}》小说详情`} onClick={() => openExistingNovelDetail("completed")}>
                   <span className={`live-cover ${existingNovelEdits.completed.customCover ? existingNovelEdits.completed.coverClass : "generated"}`}>{existingNovelEdits.completed.name}</span>
                 </button>
-                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("completed")}>{existingNovelEdits.completed.name}</button><span className="live-status done">签约完成</span></div><p>溪源 著</p><small>12,604字　｜　女频 · 现实情感</small></div>
-                <div className="live-work-actions"><button className="pill-action soft" onClick={() => openEditNovel("completed")}>编辑</button></div>
-              </article>
+                <div className="live-work-main"><div className="live-work-title"><button className="work-title-link" onClick={() => openExistingNovelDetail("completed")}>{existingNovelEdits.completed.name}</button><span className="live-status done">签约完成</span></div><small>12,604字　｜　女频 · 现实情感</small></div>
+                <div className="live-work-actions"><button className="pill-action soft" onClick={() => openEditNovel("completed")}>编辑</button><button className="pill-action delete-work-action" onClick={() => setDeleteWorkTarget({key: "completed", name: existingNovelEdits.completed.name})}>删除</button></div>
+              </article>}
             </section>
-            <div className="author-pagination">共 4 条　‹　<b>1</b>　›　 <span>10 条/页⌄</span></div>
+            <div className="author-pagination">共 {visibleWorkCount} 条　‹　<b>1</b>　›　 <span>10 条/页⌄</span></div>
           </>}
 
           {view === "income" && <>
@@ -974,6 +989,18 @@ function AuthorDemo({ state, setState }: { state: EsignState; setState: (state: 
           <p>确认删除 {detailChapters.find(chapter => chapter.id === deleteChapterId)?.title || "该章节"}吗？</p>
           <span>删除后不可恢复，请谨慎操作。</span>
           <div><button className="soft-button" onClick={() => setDeleteChapterId(null)}>取消</button><button className="danger-button" onClick={confirmDeleteChapter}>确定</button></div>
+        </div>
+      </div>}
+
+      {deleteWorkTarget && <div className="overlay" onClick={() => setDeleteWorkTarget(null)}>
+        <div className="work-delete-confirm" role="dialog" aria-label="删除小说" onClick={event => event.stopPropagation()}>
+          <button className="close" aria-label="关闭" onClick={() => setDeleteWorkTarget(null)}>×</button>
+          <h2>确认删除该本小说吗?</h2>
+          <p>小说一旦删除，将无法恢复</p>
+          <footer>
+            <button className="soft-button" onClick={() => setDeleteWorkTarget(null)}>取消</button>
+            <button className="mint-button" onClick={confirmDeleteWork}>确认</button>
+          </footer>
         </div>
       </div>}
 
